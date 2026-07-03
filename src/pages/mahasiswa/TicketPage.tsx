@@ -165,6 +165,58 @@ export default function TicketPage() {
 
   if (!booking || !mahasiswa) return <div className="min-h-screen flex items-center justify-center">Tiket tidak valid.</div>;
 
+  if (booking.status === 'Sudah Diambil') {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4 py-12 flex flex-col items-center justify-center">
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-[24px] overflow-hidden shadow-xl p-8 flex flex-col items-center text-center">
+          {/* UII Badge */}
+          <div className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-md p-2">
+            <img 
+              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              alt="Logo UII" 
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          
+          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-6 border border-emerald-200 text-emerald-600">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+
+          <h2 className="text-xl font-bold text-gray-900 mb-2">KTM Sudah Diambil</h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed max-w-xs mx-auto">
+            Kartu Tanda Mahasiswa (KTM) Anda telah berhasil diambil dan diserahkan oleh petugas administrasi.
+          </p>
+
+          <div className="w-full bg-slate-50 rounded-2xl p-5 mb-8 border border-slate-100 text-left space-y-3">
+            <div className="flex justify-between text-xs border-b border-dashed border-slate-200 pb-2">
+              <span className="text-gray-500 font-medium">NAMA</span>
+              <span className="font-bold text-gray-800 text-right">{mahasiswa.nama}</span>
+            </div>
+            <div className="flex justify-between text-xs border-b border-dashed border-slate-200 pb-2">
+              <span className="text-gray-500 font-medium">NIM</span>
+              <span className="font-bold text-gray-800 text-right font-mono">{mahasiswa.nim}</span>
+            </div>
+            <div className="flex justify-between text-xs border-b border-dashed border-slate-200 pb-2">
+              <span className="text-gray-500 font-medium">PRODI</span>
+              <span className="font-bold text-gray-800 text-right">{mahasiswa.prodi}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-500 font-medium">ID BOOKING</span>
+              <span className="font-bold text-[#005BAC] text-right font-mono">{booking.booking_id}</span>
+            </div>
+          </div>
+
+          <Button asChild className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold h-11 rounded-xl shadow-md">
+            <Link to="/">
+              Kembali ke Beranda
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const isExpired = booking.status === 'Hangus' || isBookingExpired(booking.tanggal, booking.jam);
 
   return (

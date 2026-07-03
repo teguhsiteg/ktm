@@ -108,23 +108,36 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ nim: '', ttl: '', prodi: '', wa: '' });
-  const [prodis, setProdis] = useState<string[]>([]);
+  const [prodis, setProdis] = useState<string[]>([
+    'Informatika',
+    'Teknik Industri',
+    'Teknik Kimia',
+    'Teknik Sipil',
+    'Arsitektur',
+    'Teknik Lingkungan',
+    'Statistika',
+    'Kimia',
+    'Farmasi',
+    'Kedokteran',
+    'Hukum',
+    'Manajemen',
+    'Akuntansi',
+    'Ilmu Ekonomi',
+    'Ilmu Komunikasi',
+    'Hubungan Internasional',
+    'Psikologi',
+    'Pendidikan Agama Islam',
+    'Hukum Keluarga (Ahwal Syakhshiyah)',
+    'Ekonomi Islam',
+    'Pendidikan Bahasa Inggris',
+    'Pendidikan Kimia',
+    'D3 Analisis Kimia',
+    'D3 Akuntansi',
+    'D3 Manajemen',
+    'D3 Perbankan & Keuangan'
+  ]);
   const [result, setResult] = useState<Mahasiswa | null>(null);
   const [searchDone, setSearchDone] = useState(false);
-
-  useEffect(() => {
-    const fetchProdis = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'mahasiswa'));
-        const list = snap.docs.map(d => (d.data().prodi || '') as string).filter(Boolean);
-        const unique = Array.from(new Set(list)).sort();
-        setProdis(unique);
-      } catch (err) {
-        console.error('Error fetching prodis:', err);
-      }
-    };
-    fetchProdis();
-  }, []);
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();

@@ -2,30 +2,68 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Basic rules for the application
-    
-    match /mahasiswa/{document=**} {
-      allow read, write: if true;
+
+    // Helper to check if user is logged in as an authenticated Administrator
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    // --- MAHASISWA COLLECTION ---
+    match /mahasiswa/{mhsId} {
+      // Admins have full read and write capabilities
+      allow write: if isAdmin();
+      // Public can read single or query list of students (for verification)
+      allow read: if true;
     }
     
-    match /jadwal/{document=**} {
-      allow read, write: if true;
+    // --- JADWAL COLLECTION ---
+    match /jadwal/{jadwalId} {
+      // Admins have full write capabilities
+      allow write: if isAdmin();
+      // Public can read single or list of schedules
+      allow read: if true;
+      
+      // Public can ONLY increment booked_count (cannot alter other fields or decrease count)
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked_count'])
+                    && request.resource.data.booked_count == resource.data.booked_count + 1;
     }
     
-    match /booking/{document=**} {
-      allow read, write: if true;
+    // --- BOOKING COLLECTION ---
+    match /booking/{bookingId} {
+      // Admins have full write capabilities
+      allow write: if isAdmin();
+      // Public can read or list bookings to check reservation status
+      allow read: if true;
+      
+      // Public can create new bookings with initial status "Belum Diambil" and required schema keys
+      allow create: if request.resource.data.status == 'Belum Diambil' 
+                    && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'jadwal_id', 'tanggal', 'jam', 'wa', 'status', 'qr_token', 'created_at', 'updated_at']);
+                    
+      // Public can only change ticket status to "Hangus" to flag expired bookings
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at'])
+                    && request.resource.data.status == 'Hangus';
     }
     
-    match /distribusi/{document=**} {
-      allow read, write: if true;
+    // --- DISTRIBUSI (ACTIVITY LOGS) COLLECTION ---
+    match /distribusi/{distribusiId} {
+      // Only Admins can read or write logs of actual KTM hand-overs
+      allow read, write: if isAdmin();
     }
     
-    match /activity/{document=**} {
-      allow read, write: if true;
+    // --- ACTIVITY LOGS COLLECTION ---
+    match /activity/{activityId} {
+      // Only Admins can read or write system activities
+      allow read, write: if isAdmin();
     }
     
-    match /live_scans/{document=**} {
-      allow read, write: if true;
+    // --- LIVE_SCANS (PUBLIC SCAN QUEUE) COLLECTION ---
+    match /live_scans/{scanId} {
+      // Admins have full access to view, update, and clear the queue
+      allow read, write: if isAdmin();
+      
+      // Public scanner can write a new scan entry to the queue for admin real-time terminal display
+      allow create: if request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'nim', 'nama', 'prodi', 'scanned_at', 'status', 'is_early']);
     }
   }
 }

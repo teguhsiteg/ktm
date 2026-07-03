@@ -19,12 +19,17 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   
-  const [filter, setFilter] = useState({ search: '', status: 'Semua', tanggal: '', sesi: 'Semua' });
+  const [filter, setFilter] = useState({ search: '', status: 'Semua', tanggal: '', sesi: 'Semua', prodi: 'Semua' });
 
   const uniqueSessions = useMemo(() => {
     const sessions = bookings.map(b => b.jam).filter(Boolean);
     return Array.from(new Set(sessions)).sort();
   }, [bookings]);
+
+  const uniqueProdis = useMemo(() => {
+    const prodis = bookings.map(b => mahasiswaMap[b.mahasiswa_id]?.prodi).filter(Boolean);
+    return Array.from(new Set(prodis)).sort();
+  }, [bookings, mahasiswaMap]);
 
   // Pagination & Sorting
   const [itemsPerPage, setItemsPerPage] = useState<'10' | '20' | '30' | 'Semua'>('10');
@@ -97,6 +102,7 @@ export default function BookingPage() {
         if (filter.status !== 'Semua' && b.status !== filter.status) return false;
         if (filter.tanggal && b.tanggal !== filter.tanggal) return false;
         if (filter.sesi && filter.sesi !== 'Semua' && b.jam !== filter.sesi) return false;
+        if (filter.prodi && filter.prodi !== 'Semua' && b.mhs?.prodi !== filter.prodi) return false;
         if (filter.search) {
           const s = filter.search.toLowerCase();
           const matchName = b.mhs?.nama?.toLowerCase().includes(s);
@@ -320,7 +326,19 @@ export default function BookingPage() {
               className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
             />
           </div>
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
+            <select 
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+              value={filter.prodi}
+              onChange={e => setFilter({ ...filter, prodi: e.target.value })}
+            >
+              <option value="Semua" className="dark:bg-[#1E1E1E]">Semua Prodi</option>
+              {uniqueProdis.map(prodi => (
+                <option key={prodi} value={prodi} className="dark:bg-[#1E1E1E]">{prodi}</option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-2">
             <select 
               className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
               value={filter.sesi}
@@ -344,11 +362,11 @@ export default function BookingPage() {
               <option value="Hangus" className="dark:bg-[#1E1E1E]">Hangus</option>
             </select>
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <select 
               value={itemsPerPage}
               onChange={e => setItemsPerPage(e.target.value as any)}
-              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-2 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none"
             >
               <option value="10">10 / hal</option>
               <option value="20">20 / hal</option>
