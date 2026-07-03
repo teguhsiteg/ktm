@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, serverTimestamp, writeBatch, doc, getDocs, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, writeBatch, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { Mahasiswa, Booking } from '@/types';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -88,15 +88,10 @@ export default function MahasiswaPage() {
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await setDoc(doc(db, 'mahasiswa', newMhs.nim), {
+      await addDoc(collection(db, 'mahasiswa'), {
         ...newMhs,
         created_at: serverTimestamp()
       });
-      if (newMhs.prodi) {
-        await setDoc(doc(db, 'metadata', 'prodis'), {
-          list: arrayUnion(newMhs.prodi)
-        }, { merge: true });
-      }
       toast.success('Berhasil menambahkan mahasiswa');
       setShowAdd(false);
       setNewMhs({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
@@ -122,17 +117,14 @@ export default function MahasiswaPage() {
         // Batch write to Firestore (max 500 per batch, simplify here)
         const batch = writeBatch(db);
         let count = 0;
-        const newProdis = new Set<string>();
         
         data.forEach((row: any) => {
           if (row.NIM && row.Nama) {
-            const prodi = String(row['Program Studi'] || row.Prodi || '').trim();
-            if (prodi) newProdis.add(prodi);
-            const ref = doc(db, 'mahasiswa', String(row.NIM));
+            const ref = doc(collection(db, 'mahasiswa'));
             batch.set(ref, {
               nim: String(row.NIM),
               nama: String(row.Nama),
-              prodi: prodi,
+              prodi: String(row['Program Studi'] || row.Prodi || ''),
               ttl: String(row.TTL || row['Tanggal Lahir'] || row['Tempat Tanggal Lahir'] || ''),
               status_ktm: String(row['Status KTM'] || 'Tersedia'),
               created_at: serverTimestamp()
@@ -142,11 +134,6 @@ export default function MahasiswaPage() {
         });
         
         if (count > 0) {
-          if (newProdis.size > 0) {
-            batch.set(doc(db, 'metadata', 'prodis'), {
-              list: arrayUnion(...Array.from(newProdis))
-            }, { merge: true });
-          }
           await batch.commit();
           toast.success(`Berhasil import ${count} data mahasiswa`);
         } else {
@@ -269,7 +256,12 @@ export default function MahasiswaPage() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedIds([]);
   }, [searchQuery, filterStatus, filterProdi, itemsPerPage]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [currentPage]);
 
   const handleSort = (key: keyof Mahasiswa) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -307,7 +299,7 @@ export default function MahasiswaPage() {
       </div>
 
        {showAdd && (
-        <Card className="glass-card shadow-sm rounded-[24px] border border-slate-200/50 dark:border-slate-800/50">
+        <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800">
           <CardHeader>
             <CardTitle className="text-lg">Tambah Mahasiswa Manual</CardTitle>
           </CardHeader>
@@ -331,9 +323,9 @@ export default function MahasiswaPage() {
                   <Input placeholder="Contoh: 5/02/95" value={newMhs.ttl} onChange={e => setNewMhs({...newMhs, ttl: e.target.value})} required className="dark:bg-[#2A2A2A] dark:border-gray-800" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">Status KTM</label>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Status KTM</label>
                   <select 
-                    className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
                     value={newMhs.status_ktm} onChange={e => setNewMhs({...newMhs, status_ktm: e.target.value})}
                   >
                     <option value="Tersedia" className="dark:bg-[#1E1E1E]">Tersedia</option>
@@ -363,14 +355,14 @@ export default function MahasiswaPage() {
       )}
 
       {/* Global Search and Filter Section */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-[24px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-white dark:bg-[#1E1E1E] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="md:col-span-5 relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400 dark:text-gray-500" />
           <Input 
             placeholder="Cari berdasarkan nama mahasiswa atau NIM..." 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 w-full bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 rounded-xl focus-visible:ring-brand"
+            className="pl-10 h-10 w-full dark:bg-[#2A2A2A] dark:border-gray-800 dark:text-gray-100"
           />
           {searchQuery && (
             <button 
@@ -387,7 +379,7 @@ export default function MahasiswaPage() {
           <select 
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
           >
             <option value="Semua">Semua Status KTM</option>
             <option value="Tersedia">Tersedia</option>
@@ -399,7 +391,7 @@ export default function MahasiswaPage() {
           <select 
             value={filterProdi}
             onChange={e => setFilterProdi(e.target.value)}
-            className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
           >
             {uniqueProdi.map(prodi => (
               <option key={prodi} value={prodi}>{prodi === 'Semua' ? 'Semua Program Studi' : prodi}</option>
@@ -425,7 +417,7 @@ export default function MahasiswaPage() {
           <select 
             value={itemsPerPage}
             onChange={e => setItemsPerPage(e.target.value as any)}
-            className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-2 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
           >
             <option value="10">10 / hal</option>
             <option value="20">20 / hal</option>
@@ -436,10 +428,10 @@ export default function MahasiswaPage() {
       </div>
 
       {selectedIds.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-brand/5 border border-brand/15 p-4 rounded-2xl shadow-sm transition-all animate-in fade-in-50 duration-200">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#005BAC]/5 border border-[#005BAC]/15 p-4 rounded-xl shadow-sm transition-all animate-in fade-in-50 duration-200">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-brand dark:text-brand-light">
-              Terpilih <strong className="text-brand dark:text-white">{selectedIds.length}</strong> mahasiswa
+            <span className="text-sm font-medium text-[#005BAC] dark:text-blue-300">
+              Terpilih <strong>{selectedIds.length}</strong> mahasiswa
             </span>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
@@ -479,65 +471,65 @@ export default function MahasiswaPage() {
         </div>
       )}
 
-      <Card className="glass-card shadow-sm rounded-[24px] border border-slate-200/50 dark:border-slate-800/50 overflow-hidden flex flex-col">
+      <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 uppercase border-b border-slate-100 dark:border-slate-800/50">
+            <thead className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 uppercase border-b border-gray-100 dark:border-gray-800">
               <tr>
-                <th className="w-12 px-6 py-4">
+                <th className="w-12 px-6 py-3.5">
                   <input 
                     type="checkbox" 
-                    className="rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand cursor-pointer"
+                    className="rounded border-gray-300 dark:border-gray-800 text-[#005BAC] focus:ring-[#005BAC] cursor-pointer"
                     checked={isAllSelected}
                     onChange={toggleSelectAll}
                   />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider">No</th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('nim')}>
+                <th className="px-6 py-3.5 font-medium">No</th>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('nim')}>
                   NIM <SortIndicator columnKey="nim" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('nama')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('nama')}>
                   Nama <SortIndicator columnKey="nama" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('prodi')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('prodi')}>
                   Program Studi <SortIndicator columnKey="prodi" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('ttl')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('ttl')}>
                   TTL <SortIndicator columnKey="ttl" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('status_ktm')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('status_ktm')}>
                   Status KTM <SortIndicator columnKey="status_ktm" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider text-right">Aksi</th>
+                <th className="px-6 py-3.5 font-medium text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400 font-medium">Memuat data...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center dark:text-gray-400">Memuat data...</td></tr>
               ) : currentData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400 font-medium">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     {mahasiswa.length === 0 ? 'Data kosong' : 'Tidak ada mahasiswa yang cocok dengan pencarian / filter'}
                   </td>
                 </tr>
               ) : (
                 currentData.map((m, idx) => (
-                  <tr key={m.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors duration-150 ${m.id && selectedIds.includes(m.id) ? 'bg-brand/5 dark:bg-brand/10' : ''}`}>
+                  <tr key={m.id} className={`hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors duration-150 ${m.id && selectedIds.includes(m.id) ? 'bg-blue-50/30 dark:bg-[#005BAC]/5' : ''}`}>
                     <td className="px-6 py-4">
                       <input 
                         type="checkbox" 
-                        className="rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand cursor-pointer"
+                        className="rounded border-gray-300 dark:border-gray-800 text-[#005BAC] focus:ring-[#005BAC] cursor-pointer"
                         checked={m.id ? selectedIds.includes(m.id) : false}
                         onChange={() => m.id && toggleSelect(m.id)}
                       />
                     </td>
-                    <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">
+                    <td className="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">
                       {itemsPerPage === 'Semua' ? idx + 1 : (currentPage - 1) * parseInt(itemsPerPage) + idx + 1}
                     </td>
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">{m.nim}</td>
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">{m.nama}</td>
-                    <td className="px-6 py-4 font-medium text-slate-600 dark:text-slate-400">{m.prodi}</td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{m.ttl || '-'}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{m.nim}</td>
+                    <td className="px-6 py-4 dark:text-gray-200">{m.nama}</td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.prodi}</td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.ttl || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${m.status_ktm === 'Tersedia' ? 'bg-green-100 dark:bg-green-950/40 text-green-800 dark:text-green-300' : 'bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300'}`}>
@@ -551,7 +543,7 @@ export default function MahasiswaPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setEditingMhs(m)} className="h-8 px-3 text-brand hover:bg-brand/10 dark:text-blue-400 transition-colors font-medium">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingMhs(m)} className="h-8 px-2.5 text-[#005BAC] dark:text-blue-400 hover:bg-[#005BAC]/5">
                         Edit
                       </Button>
                     </td>
@@ -563,8 +555,8 @@ export default function MahasiswaPage() {
         </div>
         
         {itemsPerPage !== 'Semua' && totalPages > 1 && (
-          <div className="border-t border-slate-100 dark:border-slate-800/50 p-4 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900/30 rounded-b-[24px]">
-            <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <div className="border-t border-gray-100 dark:border-gray-800 p-4 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               Halaman {currentPage} dari {totalPages}
             </div>
             <div className="flex gap-1">
@@ -604,9 +596,9 @@ export default function MahasiswaPage() {
 
       {/* Edit Mahasiswa Modal */}
       {editingMhs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" id="edit-modal">
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800/80 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" id="edit-modal">
+          <div className="bg-white dark:bg-[#1E1E1E] border dark:border-gray-800 w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
               <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Edit Data Mahasiswa</h3>
               <button 
                 onClick={() => setEditingMhs(null)}

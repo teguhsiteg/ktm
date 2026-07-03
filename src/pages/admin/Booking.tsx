@@ -8,7 +8,7 @@ import { Booking, Mahasiswa } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle, MessageCircle } from 'lucide-react';
+import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
@@ -292,18 +292,6 @@ export default function BookingPage() {
     }
   };
 
-  const generateWAMessage = (b: any) => {
-    if (!b || !b.mhs) return `https://wa.me/${b.wa}`;
-    
-    let tanggalText = b.tanggal;
-    try {
-      tanggalText = format(parseISO(b.tanggal), 'dd MMMM yyyy', { locale: localeID });
-    } catch (e) {}
-
-    const text = `Halo *${b.mhs.nama}* (${b.mhs.nim}),\n\nKami dari Admin Distribusi KTM UII. Kami ingin menginformasikan jadwal pengambilan KTM Anda yang telah terkonfirmasi pada:\n\n📅 *Tanggal:* ${tanggalText}\n⏰ *Sesi Waktu:* ${b.jam} WIB\n\nMohon hadir tepat waktu dan siapkan kartu identitas Anda. Terima kasih!`;
-    return `https://wa.me/${b.wa}?text=${encodeURIComponent(text)}`;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -313,20 +301,20 @@ export default function BookingPage() {
             Menampilkan {currentData.length} dari {processedData.length} data
           </p>
         </div>
-        <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm" className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl shadow-sm">
-          <Download className="w-4 h-4 mr-2 text-brand" />
+        <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm">
+          <Download className="w-4 h-4 mr-2" />
           {exporting ? 'Exporting...' : 'Export Filtered Data'}
         </Button>
       </div>
 
-      <Card className="glass-card shadow-sm rounded-[24px] border border-slate-200/50 dark:border-slate-800/50">
+      <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-3">
             <Input 
               placeholder="Cari NIM, Nama..." 
               value={filter.search}
               onChange={e => setFilter({ ...filter, search: e.target.value })}
-              className="w-full bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 rounded-xl focus-visible:ring-brand"
+              className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
             />
           </div>
           <div className="md:col-span-2">
@@ -334,12 +322,12 @@ export default function BookingPage() {
               type="date"
               value={filter.tanggal}
               onChange={e => setFilter({ ...filter, tanggal: e.target.value })}
-              className="w-full bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 rounded-xl focus-visible:ring-brand"
+              className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
             />
           </div>
           <div className="md:col-span-3">
             <select 
-              className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
               value={filter.sesi}
               onChange={e => setFilter({ ...filter, sesi: e.target.value })}
             >
@@ -351,7 +339,7 @@ export default function BookingPage() {
           </div>
           <div className="md:col-span-2">
             <select 
-              className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
               value={filter.status}
               onChange={e => setFilter({ ...filter, status: e.target.value })}
             >
@@ -365,7 +353,7 @@ export default function BookingPage() {
             <select 
               value={itemsPerPage}
               onChange={e => setItemsPerPage(e.target.value as any)}
-              className="flex h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-shadow"
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
             >
               <option value="10">10 / hal</option>
               <option value="20">20 / hal</option>
@@ -377,10 +365,10 @@ export default function BookingPage() {
       </Card>
 
       {selectedIds.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-brand/5 border border-brand/15 p-4 rounded-2xl shadow-sm transition-all animate-in fade-in-50 duration-200">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#005BAC]/5 border border-[#005BAC]/15 p-4 rounded-xl shadow-sm transition-all animate-in fade-in-50 duration-200">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-brand dark:text-brand-light">
-              Terpilih <strong className="text-brand dark:text-white">{selectedIds.length}</strong> booking
+            <span className="text-sm font-medium text-[#005BAC] dark:text-blue-300">
+              Terpilih <strong>{selectedIds.length}</strong> booking
             </span>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
@@ -420,76 +408,69 @@ export default function BookingPage() {
         </div>
       )}
 
-      <Card className="glass-card shadow-sm rounded-[24px] border border-slate-200/50 dark:border-slate-800/50 overflow-hidden flex flex-col">
+      <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 uppercase border-b border-slate-100 dark:border-slate-800/50">
+            <thead className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 uppercase">
               <tr>
-                <th className="w-12 px-6 py-4">
+                <th className="w-12 px-6 py-3.5">
                   <input 
                     type="checkbox" 
-                    className="rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand cursor-pointer"
+                    className="rounded border-gray-300 dark:border-gray-800 text-[#005BAC] focus:ring-[#005BAC] cursor-pointer"
                     checked={isAllSelected}
                     onChange={toggleSelectAll}
                   />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider">No</th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('booking_id')}>
+                <th className="px-6 py-3 font-medium">No</th>
+                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('booking_id')}>
                   Booking ID <SortIndicator columnKey="booking_id" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('mahasiswa')}>
+                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('mahasiswa')}>
                   Mahasiswa <SortIndicator columnKey="mahasiswa" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('wa')}>
+                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('wa')}>
                   WA <SortIndicator columnKey="wa" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('jadwal')}>
+                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('jadwal')}>
                   Jadwal <SortIndicator columnKey="jadwal" />
                 </th>
-                <th className="px-6 py-4 font-semibold tracking-wider cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => handleSort('status')}>
+                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('status')}>
                   Status <SortIndicator columnKey="status" />
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400 font-medium">Memuat data...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-4 text-center dark:text-gray-400">Memuat data...</td></tr>
               ) : currentData.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400 font-medium">Data kosong</td></tr>
+                <tr><td colSpan={7} className="px-6 py-4 text-center dark:text-gray-400">Data kosong</td></tr>
               ) : (
                 currentData.map((b, idx) => (
-                  <tr key={b.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors duration-150 ${b.id && selectedIds.includes(b.id) ? 'bg-brand/5 dark:bg-brand/10' : ''}`}>
+                  <tr key={b.id} className={`hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors duration-150 ${b.id && selectedIds.includes(b.id) ? 'bg-blue-50/30 dark:bg-[#005BAC]/5' : ''}`}>
                     <td className="px-6 py-4">
                       <input 
                         type="checkbox" 
-                        className="rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand cursor-pointer"
+                        className="rounded border-gray-300 dark:border-gray-800 text-[#005BAC] focus:ring-[#005BAC] cursor-pointer"
                         checked={b.id ? selectedIds.includes(b.id) : false}
                         onChange={() => b.id && toggleSelect(b.id)}
                       />
                     </td>
-                    <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">
+                    <td className="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">
                       {itemsPerPage === 'Semua' ? idx + 1 : (currentPage - 1) * parseInt(itemsPerPage) + idx + 1}
                     </td>
-                    <td className="px-6 py-4 font-mono text-xs text-brand font-bold bg-brand/5 dark:bg-brand/10 rounded px-2 py-1 m-4 inline-block">{b.booking_id}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-[#005BAC] dark:text-[#8AB4F8] font-bold">{b.booking_id}</td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{b.mhs?.nama}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-0.5">{b.mhs?.nim} • {b.mhs?.prodi}</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{b.mhs?.nama}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-xs">{b.mhs?.nim} • {b.mhs?.prodi}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <a 
-                        href={generateWAMessage(b)} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 font-medium rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 transition-colors shadow-sm"
-                        title="Kirim Pesan WhatsApp"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="text-xs">{b.wa}</span>
+                    <td className="px-6 py-4 dark:text-gray-200">
+                      <a href={`https://wa.me/${b.wa}`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline">
+                        {b.wa}
                       </a>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">{format(parseISO(b.tanggal), 'dd MMM yyyy', { locale: localeID })}</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-0.5">{b.jam}</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{format(parseISO(b.tanggal), 'dd MMM yyyy', { locale: localeID })}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-xs">{b.jam}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
@@ -516,8 +497,8 @@ export default function BookingPage() {
         </div>
 
         {itemsPerPage !== 'Semua' && totalPages > 1 && (
-          <div className="border-t border-slate-100 dark:border-slate-800/50 p-4 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900/30 rounded-b-[24px]">
-            <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <div className="border-t border-gray-100 dark:border-gray-800 p-4 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               Halaman {currentPage} dari {totalPages}
             </div>
             <div className="flex gap-1">

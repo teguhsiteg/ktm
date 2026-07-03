@@ -365,10 +365,10 @@ export default function ScannerPage() {
       
       {/* Left Column: Scanner & Result (Compact) */}
       <div className="w-full lg:w-[45%] flex flex-col gap-6">
-        <Card className="glass-card shadow-sm rounded-[24px] border border-slate-200/50 dark:border-slate-800/50">
-          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/50">
-            <CardTitle className="text-lg flex items-center text-slate-800 dark:text-slate-100">
-              <Scan className="w-5 h-5 mr-2 text-brand" /> 
+        <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800 shadow-sm">
+          <CardHeader className="pb-3 border-b border-gray-100 dark:border-gray-800">
+            <CardTitle className="text-lg flex items-center">
+              <Scan className="w-5 h-5 mr-2 text-[#005BAC] dark:text-[#8AB4F8]" /> 
               QR Scanner
             </CardTitle>
           </CardHeader>
@@ -379,13 +379,13 @@ export default function ScannerPage() {
           </CardContent>
         </Card>
 
-        <Card className={`glass-card flex-1 transition-all duration-300 border shadow-sm rounded-[24px] overflow-hidden ${
-          status === 'valid' && isEarly ? 'border-amber-400 bg-amber-50/80 dark:bg-amber-950/20' :
-          status === 'valid' ? 'border-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/20' :
-          status === 'used' ? 'border-amber-400 bg-amber-50/80 dark:bg-amber-950/20' :
-          status === 'expired' ? 'border-red-400 bg-red-50/80 dark:bg-red-950/20' :
-          status === 'invalid' ? 'border-red-400 bg-red-50/80 dark:bg-red-950/20' :
-          'border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-900/50'
+        <Card className={`flex-1 transition-colors duration-300 border shadow-sm ${
+          status === 'valid' && isEarly ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
+          status === 'valid' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' :
+          status === 'used' ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
+          status === 'expired' ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20' :
+          status === 'invalid' ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20' :
+          'border-gray-200 bg-white dark:bg-[#1E1E1E] dark:border-gray-800'
         }`}>
           <CardContent className="p-6 flex flex-col items-center justify-center text-center min-h-[300px]">
             {status === 'idle' && (
@@ -396,10 +396,7 @@ export default function ScannerPage() {
             )}
 
             {status === 'loading' && (
-              <div className="text-brand font-bold animate-pulse flex flex-col items-center">
-                <div className="w-10 h-10 border-4 border-brand/20 border-t-brand rounded-full animate-spin mb-4"></div>
-                Memeriksa QR Code...
-              </div>
+              <div className="text-[#005BAC] dark:text-[#8AB4F8] font-medium">Memeriksa QR Code...</div>
             )}
 
             {status === 'invalid' && (
@@ -462,19 +459,19 @@ export default function ScannerPage() {
                     </div>
                   )}
                   
-                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5 text-left mt-4 space-y-3 shadow-sm text-sm w-full">
+                  <div className="bg-white dark:bg-[#2A2A2A] rounded-xl border border-gray-200 dark:border-gray-800 p-4 text-left mt-4 space-y-2 shadow-sm text-sm w-full">
                     <div>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold">Nama</p>
-                      <p className="font-bold text-slate-900 dark:text-slate-100 text-base">{mahasiswa.nama}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Nama</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{mahasiswa.nama}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100 dark:border-slate-800/50">
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
                       <div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold">NIM</p>
-                        <p className="font-bold text-slate-900 dark:text-slate-100">{mahasiswa.nim}</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">NIM</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{mahasiswa.nim}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-semibold">Prodi</p>
-                        <p className="font-bold text-slate-900 dark:text-slate-100">{mahasiswa.prodi}</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Prodi</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{mahasiswa.prodi}</p>
                       </div>
                     </div>
                   </div>
@@ -483,10 +480,10 @@ export default function ScannerPage() {
                 <div className="mt-6 w-full space-y-2">
                   {status === 'valid' && (
                     <Button 
-                      className={`w-full text-white shadow-lg font-semibold h-12 rounded-xl transition-all duration-300 hover:scale-[1.02] ${
+                      className={`w-full text-white shadow-sm ${
                         isEarly 
-                          ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/25' 
-                          : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25'
+                          ? 'bg-amber-600 hover:bg-amber-700' 
+                          : 'bg-emerald-600 hover:bg-emerald-700'
                       }`} 
                       onClick={handleSerahkan} 
                       disabled={submitting}
@@ -505,9 +502,9 @@ export default function ScannerPage() {
       </div>
 
       {/* Right Column: Live Queue & History */}
-      <div className="w-full lg:w-[55%] flex flex-col h-full gap-6">
-        <Card className="flex-1 glass-card shadow-sm overflow-hidden flex flex-col rounded-[24px] border border-slate-200/50 dark:border-slate-800/50">
-          <CardHeader className="bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800/50 py-4">
+      <div className="w-full lg:w-[55%] flex flex-col h-full">
+        <Card className="flex-1 bg-white dark:bg-[#1E1E1E] dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
+          <CardHeader className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 py-3">
             <div className="flex items-center justify-between">
               <div className="flex gap-2">
                 <Button 
@@ -551,7 +548,7 @@ export default function ScannerPage() {
                   {liveQueue.map((item) => (
                     <li key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors flex items-center justify-between group">
                       <div className="flex items-start gap-3">
-                        <div className="bg-brand/10 dark:bg-brand/20 p-2.5 rounded-full text-brand mt-0.5">
+                        <div className="bg-[#E8F0FE] dark:bg-[#1A2E4C] p-2 rounded-full text-[#005BAC] dark:text-[#8AB4F8] mt-0.5">
                           <Clock className="w-4 h-4" />
                         </div>
                         <div>
@@ -581,10 +578,10 @@ export default function ScannerPage() {
                         <Button 
                           size="sm" 
                           onClick={() => handleSerahkanQueue(item)}
-                          className="bg-brand hover:bg-brand-dark text-white h-9 px-4 rounded-xl flex items-center gap-1.5 font-bold text-xs shadow-md shadow-brand/20 transition-all hover:scale-[1.02]"
+                          className="bg-[#005BAC] hover:bg-[#004B8C] dark:bg-[#1A73E8] dark:hover:bg-[#1557B0] text-white h-8 px-3 rounded-lg flex items-center gap-1 font-medium text-xs"
                           disabled={submitting}
                         >
-                          <ArrowRight className="w-4 h-4" />
+                          <ArrowRight className="w-3.5 h-3.5" />
                           Serahkan KTM
                         </Button>
                       </div>
