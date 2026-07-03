@@ -256,12 +256,7 @@ export default function MahasiswaPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedIds([]);
   }, [searchQuery, filterStatus, filterProdi, itemsPerPage]);
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [currentPage]);
 
   const handleSort = (key: keyof Mahasiswa) => {
     let direction: 'asc' | 'desc' = 'asc';

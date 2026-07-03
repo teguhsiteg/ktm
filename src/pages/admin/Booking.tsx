@@ -8,7 +8,7 @@ import { Booking, Mahasiswa } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle } from 'lucide-react';
+import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
@@ -292,6 +292,18 @@ export default function BookingPage() {
     }
   };
 
+  const generateWAMessage = (b: any) => {
+    if (!b || !b.mhs) return `https://wa.me/${b.wa}`;
+    
+    let tanggalText = b.tanggal;
+    try {
+      tanggalText = format(parseISO(b.tanggal), 'dd MMMM yyyy', { locale: localeID });
+    } catch (e) {}
+
+    const text = `Halo *${b.mhs.nama}* (${b.mhs.nim}),\n\nKami dari Admin Distribusi KTM UII. Kami ingin menginformasikan jadwal pengambilan KTM Anda yang telah terkonfirmasi pada:\n\n📅 *Tanggal:* ${tanggalText}\n⏰ *Sesi Waktu:* ${b.jam} WIB\n\nMohon hadir tepat waktu dan siapkan kartu identitas Anda. Terima kasih!`;
+    return `https://wa.me/${b.wa}?text=${encodeURIComponent(text)}`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -464,8 +476,15 @@ export default function BookingPage() {
                       <div className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-0.5">{b.mhs?.nim} • {b.mhs?.prodi}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <a href={`https://wa.me/${b.wa}`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium hover:underline transition-colors">
-                        {b.wa}
+                      <a 
+                        href={generateWAMessage(b)} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 font-medium rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 transition-colors shadow-sm"
+                        title="Kirim Pesan WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="text-xs">{b.wa}</span>
                       </a>
                     </td>
                     <td className="px-6 py-4">
