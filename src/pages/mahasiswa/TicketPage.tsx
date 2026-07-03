@@ -50,7 +50,7 @@ export default function TicketPage() {
           clearInterval(intervalId);
           return;
         }
-        const b = snap.docs[0].data() as Booking;
+        const b = { id: snap.docs[0].id, ...snap.docs[0].data() } as Booking;
         setBooking(b);
         
         const mDoc = await getDoc(doc(db, 'mahasiswa', b.mahasiswa_id));
@@ -323,6 +323,20 @@ export default function TicketPage() {
                <Button asChild className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold h-11 rounded-xl shadow-md transition-all duration-200">
                  <Link to={`/schedule/${booking.mahasiswa_id}`} state={{ wa: booking.wa, reapply: true }}>
                    Ajukan Ulang
+                 </Link>
+               </Button>
+             </div>
+           )}
+
+           {/* Rescheduling options for active ticket */}
+           {!isExpired && booking.status === 'Belum Diambil' && (
+             <div className="mt-8 pt-6 border-t border-gray-200 w-full flex flex-col items-center print:hidden">
+               <p className="text-xs text-gray-500 font-medium text-center mb-4 leading-relaxed">
+                 Ingin mengubah hari atau jam pengambilan? Anda bisa menjadwalkan ulang pengambilan KTM Anda di sini.
+               </p>
+               <Button asChild variant="outline" className="w-full border-[#005BAC] text-[#005BAC] hover:bg-blue-50 font-semibold h-11 rounded-xl shadow-sm transition-all duration-200">
+                 <Link to={`/schedule/${booking.mahasiswa_id}`} state={{ wa: booking.wa, reschedule: true, oldBookingId: booking.id, oldJadwalId: booking.jadwal_id, oldBookingCode: booking.booking_id }}>
+                   Ganti Jadwal Booking
                  </Link>
                </Button>
              </div>

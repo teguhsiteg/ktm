@@ -23,9 +23,10 @@ service cloud.firestore {
       // Public can read single or list of schedules
       allow read: if true;
       
-      // Public can ONLY increment booked_count (cannot alter other fields or decrease count)
+      // Public can increment or decrement booked_count (cannot alter other fields)
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked_count'])
-                    && request.resource.data.booked_count == resource.data.booked_count + 1;
+                    && (request.resource.data.booked_count == resource.data.booked_count + 1 
+                        || request.resource.data.booked_count == resource.data.booked_count - 1);
     }
     
     // --- BOOKING COLLECTION ---
@@ -39,9 +40,11 @@ service cloud.firestore {
       allow create: if request.resource.data.status == 'Belum Diambil' 
                     && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'jadwal_id', 'tanggal', 'jam', 'wa', 'status', 'qr_token', 'created_at', 'updated_at']);
                     
-      // Public can only change ticket status to "Hangus" to flag expired bookings
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at'])
-                    && request.resource.data.status == 'Hangus';
+      // Public can change ticket status to "Hangus" to flag expired bookings OR reschedule their schedule
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at'])
+                        && request.resource.data.status == 'Hangus')
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['jadwal_id', 'tanggal', 'jam', 'updated_at'])
+                        && resource.data.status == 'Belum Diambil');
     }
     
     // --- DISTRIBUSI (ACTIVITY LOGS) COLLECTION ---

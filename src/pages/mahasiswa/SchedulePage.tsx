@@ -15,6 +15,10 @@ export default function SchedulePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const wa = location.state?.wa || '';
+  const isReschedule = location.state?.reschedule || false;
+  const oldBookingId = location.state?.oldBookingId || '';
+  const oldJadwalId = location.state?.oldJadwalId || '';
+  const oldBookingCode = location.state?.oldBookingCode || '';
 
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa | null>(null);
   const [jadwal, setJadwal] = useState<Jadwal[]>([]);
@@ -52,10 +56,10 @@ export default function SchedulePage() {
           if (takenBooking) {
             navigate(`/ticket/${takenBooking.booking_id}`, { replace: true });
             return;
-          } else if (activeBooking) {
+          } else if (activeBooking && !isReschedule) {
             navigate(`/ticket/${activeBooking.booking_id}`, { replace: true });
             return;
-          } else if (expiredBooking && !isReapply) {
+          } else if (expiredBooking && !isReapply && !isReschedule) {
             // Update expired bookings to 'Hangus' in Firestore if it wasn't already
             if (expiredBooking.status !== 'Hangus') {
               await updateDoc(doc(db, 'booking', expiredBooking.id), {
@@ -115,10 +119,20 @@ export default function SchedulePage() {
     
     try {
       const jRef = doc(db, 'jadwal', selectedJadwal.id);
-      
       const newBookingId = generateBookingId();
 
       await runTransaction(db, async (transaction) => {
+        // If rescheduling, decrement old schedule's booked_count
+        if (isReschedule && oldJadwalId) {
+          const oldJRef = doc(db, 'jadwal', oldJadwalId);
+          const oldJDoc = await transaction.get(oldJRef);
+          if (oldJDoc.exists()) {
+            const oldData = oldJDoc.data() as Jadwal;
+            const oldBooked = oldData.booked_count || 0;
+            transaction.update(oldJRef, { booked_count: Math.max(0, oldBooked - 1) });
+          }
+        }
+
         const jDoc = await transaction.get(jRef);
         if (!jDoc.exists()) throw new Error('Jadwal tidak ditemukan');
         
@@ -132,24 +146,35 @@ export default function SchedulePage() {
         // Add to booked count
         transaction.update(jRef, { booked_count: currentBooked + 1 });
         
-        // Create booking
-        const newBookingRef = doc(collection(db, 'booking'));
-        transaction.set(newBookingRef, {
-          booking_id: newBookingId,
-          mahasiswa_id: mahasiswa.id,
-          jadwal_id: selectedJadwal.id,
-          tanggal: selectedJadwal.tanggal,
-          jam: `${selectedJadwal.jam_mulai}-${selectedJadwal.jam_selesai}`,
-          wa: wa,
-          status: 'Belum Diambil',
-          qr_token: newBookingId, // For simplicity using booking ID as token
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp()
-        });
+        if (isReschedule && oldBookingId) {
+          // Update the existing booking document
+          const bookingRef = doc(db, 'booking', oldBookingId);
+          transaction.update(bookingRef, {
+            jadwal_id: selectedJadwal.id,
+            tanggal: selectedJadwal.tanggal,
+            jam: `${selectedJadwal.jam_mulai}-${selectedJadwal.jam_selesai}`,
+            updated_at: serverTimestamp()
+          });
+        } else {
+          // Create new booking
+          const newBookingRef = doc(collection(db, 'booking'));
+          transaction.set(newBookingRef, {
+            booking_id: newBookingId,
+            mahasiswa_id: mahasiswa.id,
+            jadwal_id: selectedJadwal.id,
+            tanggal: selectedJadwal.tanggal,
+            jam: `${selectedJadwal.jam_mulai}-${selectedJadwal.jam_selesai}`,
+            wa: wa,
+            status: 'Belum Diambil',
+            qr_token: newBookingId, // For simplicity using booking ID as token
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+          });
+        }
       });
 
-      toast.success('Booking berhasil!');
-      navigate(`/ticket/${newBookingId}`);
+      toast.success(isReschedule ? 'Jadwal berhasil diubah!' : 'Booking berhasil!');
+      navigate(`/ticket/${isReschedule ? oldBookingCode : newBookingId}`);
 
     } catch (err: any) {
       console.error(err);

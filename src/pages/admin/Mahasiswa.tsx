@@ -9,9 +9,11 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Download, Upload, Plus, FileSpreadsheet, Search, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle } from 'lucide-react';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { isBookingExpired } from '@/lib/utils';
 
 export default function MahasiswaPage() {
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newMhs, setNewMhs] = useState({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
@@ -33,12 +35,57 @@ export default function MahasiswaPage() {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [editingMhs, setEditingMhs] = useState<Mahasiswa | null>(null);
 
+  const getCombinedStatus = (mhs: Mahasiswa, bookingsList: Booking[]) => {
+    if (mhs.status_ktm === 'Belum tersedia') {
+      return 'Belum tersedia';
+    }
+    
+    // Find booking for this student
+    const mhsBooking = bookingsList.find(b => b.mahasiswa_id === mhs.id);
+    
+    if (mhs.status_ktm === 'Sudah diambil' || (mhsBooking && mhsBooking.status === 'Sudah Diambil')) {
+      return 'Sudah diambil';
+    }
+    
+    if (mhsBooking) {
+      if (mhsBooking.status === 'Belum Diambil') {
+        const isExpired = isBookingExpired(mhsBooking.tanggal, mhsBooking.jam);
+        return isExpired ? 'Booking Hangus' : 'Sudah Booking';
+      }
+      if (mhsBooking.status === 'Hangus') {
+        return 'Booking Hangus';
+      }
+    }
+    
+    return 'Tersedia'; // Tersedia (Belum Booking)
+  };
+
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
+    let mhsLoaded = false;
+    let bLoaded = false;
+
+    const unsubMhs = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
       setMahasiswa(snap.docs.map(d => ({ id: d.id, ...d.data() } as Mahasiswa)));
+      mhsLoaded = true;
+      if (bLoaded) setLoading(false);
+    }, (err) => {
+      console.error(err);
       setLoading(false);
     });
-    return () => unsub();
+
+    const unsubBooking = onSnapshot(collection(db, 'booking'), (snap) => {
+      setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() } as Booking)));
+      bLoaded = true;
+      if (mhsLoaded) setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubMhs();
+      unsubBooking();
+    };
   }, []);
 
   // Toggle selection for a single row
@@ -207,7 +254,8 @@ export default function MahasiswaPage() {
         (m.nama || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
         (m.nim || '').toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = filterStatus === 'Semua' || m.status_ktm === filterStatus;
+      const combStatus = getCombinedStatus(m, bookings);
+      const matchesStatus = filterStatus === 'Semua' || combStatus === filterStatus;
       
       const matchesProdi = filterProdi === 'Semua' || m.prodi === filterProdi;
       
@@ -225,7 +273,7 @@ export default function MahasiswaPage() {
     }
 
     return result;
-  }, [mahasiswa, searchQuery, filterStatus, filterProdi, sortConfig]);
+  }, [mahasiswa, bookings, searchQuery, filterStatus, filterProdi, sortConfig]);
 
   const totalPages = itemsPerPage === 'Semua' ? 1 : Math.ceil(processedMahasiswa.length / parseInt(itemsPerPage));
   const currentData = itemsPerPage === 'Semua' 
@@ -325,6 +373,7 @@ export default function MahasiswaPage() {
                   >
                     <option value="Tersedia" className="dark:bg-[#1E1E1E]">Tersedia</option>
                     <option value="Belum tersedia" className="dark:bg-[#1E1E1E]">Belum tersedia</option>
+                    <option value="Sudah diambil" className="dark:bg-[#1E1E1E]">Sudah diambil</option>
                   </select>
                 </div>
               </div>
@@ -376,9 +425,12 @@ export default function MahasiswaPage() {
             onChange={e => setFilterStatus(e.target.value)}
             className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
           >
-            <option value="Semua">Semua Status KTM</option>
-            <option value="Tersedia">Tersedia</option>
-            <option value="Belum tersedia">Belum tersedia</option>
+            <option value="Semua">Semua Status KTM & Booking</option>
+            <option value="Tersedia">Tersedia (Belum Booking)</option>
+            <option value="Sudah Booking">Sudah Booking</option>
+            <option value="Sudah diambil">Sudah Diambil</option>
+            <option value="Booking Hangus">Booking Hangus / Terlewat</option>
+            <option value="Belum tersedia">Fisik Belum Tersedia</option>
           </select>
         </div>
 
@@ -526,10 +578,49 @@ export default function MahasiswaPage() {
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.prodi}</td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.ttl || '-'}</td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${m.status_ktm === 'Tersedia' ? 'bg-green-100 dark:bg-green-950/40 text-green-800 dark:text-green-300' : 'bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300'}`}>
-                          {m.status_ktm}
-                        </span>
+                      <div className="flex flex-col gap-1.5">
+                        {(() => {
+                          const status = getCombinedStatus(m, bookings);
+                          if (status === 'Belum tersedia') {
+                            return (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold w-fit bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300">
+                                Fisik Belum Tersedia
+                              </span>
+                            );
+                          } else if (status === 'Sudah Booking') {
+                            const b = bookings.find(x => x.mahasiswa_id === m.id);
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold w-fit bg-blue-100 dark:bg-blue-950/40 text-[#005BAC] dark:text-blue-300">
+                                  Sudah Booking
+                                </span>
+                                {b && (
+                                  <span className="text-[10px] text-[#005BAC] dark:text-blue-400 font-medium">
+                                    {b.tanggal} ({b.jam})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          } else if (status === 'Sudah diambil') {
+                            return (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold w-fit bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
+                                Sudah Diambil
+                              </span>
+                            );
+                          } else if (status === 'Booking Hangus') {
+                            return (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold w-fit bg-red-100 dark:bg-red-950/40 text-red-800 dark:text-red-300">
+                                Booking Hangus / Terlewat
+                              </span>
+                            );
+                          } else {
+                            return (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold w-fit bg-green-100 dark:bg-green-950/40 text-green-800 dark:text-green-300">
+                                Tersedia (Belum Booking)
+                              </span>
+                            );
+                          }
+                        })()}
                         {m.status_ktm === 'Belum tersedia' && m.catatan_ktm && (
                           <span className="text-[11px] text-gray-500 dark:text-gray-400 italic font-normal max-w-[180px] break-words" title={m.catatan_ktm}>
                             Note: {m.catatan_ktm}
@@ -681,6 +772,7 @@ export default function MahasiswaPage() {
                 >
                   <option value="Tersedia" className="dark:bg-[#1E1E1E]">Tersedia</option>
                   <option value="Belum tersedia" className="dark:bg-[#1E1E1E]">Belum tersedia</option>
+                  <option value="Sudah diambil" className="dark:bg-[#1E1E1E]">Sudah diambil</option>
                 </select>
               </div>
 
