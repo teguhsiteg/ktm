@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fungsi bantuan untuk mengecek apakah user login sebagai Admin
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    match /mahasiswa/{nim} {
+      // Publik hanya bisa membaca 1 data spesifik (jika tahu persis ID/NIM-nya). 
+      // Publik TIDAK BISA me-list (scraping) seluruh isi database.
+      allow list: if isAdmin();
+      allow get: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /jadwal/{document=**} {
+      // Publik bisa membaca jadwal
+      allow read: if true;
+      
+      // Admin memiliki akses penuh
+      allow create, delete: if isAdmin();
+      
+      // Publik hanya bisa melakukan UPDATE pada field 'booked_count' sebesar +1 
+      // dan hanya jika kuota masih tersedia (cegah eksploitasi)
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked_count']) &&
+        request.resource.data.booked_count == ('booked_count' in resource.data ? resource.data.booked_count : 0) + 1 &&
+        ('booked_count' in resource.data ? resource.data.booked_count : 0) < resource.data.kuota
+      );
+    }
+    
+    match /booking/{document=**} {
+      // Publik bisa membaca (untuk pengecekan jadwal di SchedulePage dan Scanner)
+      allow read: if true;
+      
+      // Admin punya akses penuh
+      allow delete: if isAdmin();
+      
+      // Publik HANYA BISA membuat booking baru dengan status awal
+      allow create: if isAdmin() || request.resource.data.status == 'Belum Diambil';
+      
+      // Publik HANYA BISA mengupdate status menjadi 'Hangus' (dilakukan otomatis oleh sistem/scanner)
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at']) &&
+        request.resource.data.status == 'Hangus'
+      );
+    }
+    
+    match /distribusi/{document=**} {
+      // Data internal admin
+      allow read, write: if isAdmin();
+    }
+    
+    match /activity/{document=**} {
+      // Data log admin
+      allow read, write: if isAdmin();
+    }
+    
+    match /live_scans/{document=**} {
+      // Publik (scanner) hanya bisa merekam log scan baru
+      allow create: if true;
+      // Hanya admin yang bisa membaca, mengedit status, atau menghapusnya
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

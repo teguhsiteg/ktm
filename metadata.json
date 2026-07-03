@@ -1,0 +1,10 @@
+{
+  "name": "KTM UII Booking",
+  "description": "Sistem Booking Pengambilan KTM Universitas Islam Indonesia",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
