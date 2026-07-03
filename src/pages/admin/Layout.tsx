@@ -56,7 +56,12 @@ export default function AdminLayout() {
       {/* Sidebar Workspace style - hidden on mobile, visible on desktop */}
       <aside className="w-[260px] bg-white dark:bg-[#1E1E1E] border-r border-[#E0E0E0] dark:border-gray-800 flex flex-col hidden md:flex h-screen sticky top-0 transition-colors duration-200">
         <div className="p-6 flex items-center space-x-3 border-b border-[#E0E0E0] dark:border-gray-800">
-          <div className="w-10 h-10 bg-[#005BAC] dark:bg-[#1A73E8] rounded-xl flex items-center justify-center text-white font-bold text-xl">UII</div>
+          <img 
+            src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+            alt="Logo UII" 
+            className="w-10 h-10 object-contain"
+            referrerPolicy="no-referrer"
+          />
           <div>
             <h1 className="text-[14px] font-bold text-[#005BAC] dark:text-[#8AB4F8] leading-tight uppercase tracking-wider">KTM Booking</h1>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-medium">Management System</p>
@@ -94,7 +99,12 @@ export default function AdminLayout() {
       {/* Mobile Header - only visible on mobile */}
       <header className="h-[56px] flex-shrink-0 bg-white dark:bg-[#1E1E1E] border-b border-[#E0E0E0] dark:border-gray-800 px-4 flex md:hidden items-center justify-between z-20 transition-colors duration-200">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-[#005BAC] dark:bg-[#1A73E8] rounded-lg flex items-center justify-center text-white font-bold text-base">UII</div>
+          <img 
+            src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+            alt="Logo UII" 
+            className="w-8 h-8 object-contain"
+            referrerPolicy="no-referrer"
+          />
           <div>
             <h1 className="text-xs font-bold text-[#005BAC] dark:text-[#8AB4F8] uppercase tracking-wider">KTM Admin</h1>
           </div>

@@ -135,8 +135,13 @@ export default function TicketPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-sm text-center">
           {/* UII Badge */}
-          <div className="w-16 h-16 bg-[#005BAC] rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-6 shadow-md animate-pulse">
-            UII
+          <div className="w-16 h-16 bg-white border dark:border-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-md p-2">
+            <img 
+              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              alt="Logo UII" 
+              className="w-full h-full object-contain animate-pulse"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <h2 className="text-lg font-bold text-gray-800 mb-2">Memuat Tiket Booking...</h2>
           <p className="text-sm text-gray-500 mb-6 font-medium">Harap tunggu sebentar</p>
