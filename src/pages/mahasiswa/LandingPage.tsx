@@ -13,14 +13,6 @@ import { id as localeID } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, CalendarCheck, QrCode, ArrowRight } from 'lucide-react';
 
-const UII_PRODIS = [
-  "Akuntansi", "Arsitektur", "Biologi", "Ekonomi", "Ekonomi Islam", "Farmasi", 
-  "Hubungan Internasional", "Hukum", "Hukum Keluarga", "Ilmu Agama Islam", 
-  "Ilmu Komunikasi", "Informatika", "Kedokteran", "Kimia", "Manajemen", 
-  "Pendidikan Agama Islam", "Pendidikan Bahasa Inggris", "Pendidikan Kimia", 
-  "Psikologi", "Rekayasa Tekstil", "Statistika", "Teknik Elektro", 
-  "Teknik Industri", "Teknik Kimia", "Teknik Lingkungan", "Teknik Mesin", "Teknik Sipil"
-];
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -29,6 +21,22 @@ export default function LandingPage() {
   const [formData, setFormData] = useState({ nim: '', ttl: '', prodi: '', wa: '' });
   const [result, setResult] = useState<Mahasiswa | null>(null);
   const [searchDone, setSearchDone] = useState(false);
+  const [prodis, setProdis] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchProdis = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'metadata', 'prodis'));
+        if (docSnap.exists() && docSnap.data().list) {
+          const list = docSnap.data().list as string[];
+          setProdis(list.sort());
+        }
+      } catch (err) {
+        console.error("Gagal mengambil daftar prodi:", err);
+      }
+    };
+    fetchProdis();
+  }, []);
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
@@ -200,21 +208,21 @@ export default function LandingPage() {
                         Program Studi <span className="text-red-500 font-bold">*</span>
                       </Label>
                       <div className="relative">
-                        <select
+                        <Input
                           id="prodi"
+                          list="prodi-list"
+                          placeholder="Ketik untuk mencari Program Studi..."
                           value={formData.prodi}
                           onChange={e => setFormData({...formData, prodi: e.target.value})}
-                          className="flex h-12 w-full appearance-none rounded-xl border border-border-main bg-surface/50 px-4 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent cursor-pointer transition-all backdrop-blur-sm"
+                          className="flex h-12 w-full appearance-none rounded-xl border border-border-main bg-surface/50 px-4 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all backdrop-blur-sm"
                           required
-                        >
-                          <option value="" className="text-text-muted">Pilih Program Studi</option>
-                          {UII_PRODIS.map(p => (
-                            <option key={p} value={p}>{p}</option>
+                          autoComplete="off"
+                        />
+                        <datalist id="prodi-list">
+                          {prodis.map(p => (
+                            <option key={p} value={p} />
                           ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-text-muted">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+                        </datalist>
                       </div>
                     </div>
                     <div className="space-y-2">

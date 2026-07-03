@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, serverTimestamp, writeBatch, doc, getDocs, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, writeBatch, doc, getDocs, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Mahasiswa, Booking } from '@/types';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -92,6 +92,11 @@ export default function MahasiswaPage() {
         ...newMhs,
         created_at: serverTimestamp()
       });
+      if (newMhs.prodi) {
+        await setDoc(doc(db, 'metadata', 'prodis'), {
+          list: arrayUnion(newMhs.prodi)
+        }, { merge: true });
+      }
       toast.success('Berhasil menambahkan mahasiswa');
       setShowAdd(false);
       setNewMhs({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
@@ -117,14 +122,17 @@ export default function MahasiswaPage() {
         // Batch write to Firestore (max 500 per batch, simplify here)
         const batch = writeBatch(db);
         let count = 0;
+        const newProdis = new Set<string>();
         
         data.forEach((row: any) => {
           if (row.NIM && row.Nama) {
+            const prodi = String(row['Program Studi'] || row.Prodi || '').trim();
+            if (prodi) newProdis.add(prodi);
             const ref = doc(db, 'mahasiswa', String(row.NIM));
             batch.set(ref, {
               nim: String(row.NIM),
               nama: String(row.Nama),
-              prodi: String(row['Program Studi'] || row.Prodi || ''),
+              prodi: prodi,
               ttl: String(row.TTL || row['Tanggal Lahir'] || row['Tempat Tanggal Lahir'] || ''),
               status_ktm: String(row['Status KTM'] || 'Tersedia'),
               created_at: serverTimestamp()
@@ -134,6 +142,11 @@ export default function MahasiswaPage() {
         });
         
         if (count > 0) {
+          if (newProdis.size > 0) {
+            batch.set(doc(db, 'metadata', 'prodis'), {
+              list: arrayUnion(...Array.from(newProdis))
+            }, { merge: true });
+          }
           await batch.commit();
           toast.success(`Berhasil import ${count} data mahasiswa`);
         } else {

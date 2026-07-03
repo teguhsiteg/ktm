@@ -7,6 +7,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    match /metadata/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /mahasiswa/{nim} {
       // Publik hanya bisa membaca 1 data spesifik (jika tahu persis ID/NIM-nya). 
       // Publik TIDAK BISA me-list (scraping) seluruh isi database.
