@@ -226,12 +226,7 @@ export default function BookingPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-    setSelectedIds([]);
   }, [filter, itemsPerPage]);
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [currentPage]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -464,9 +459,24 @@ export default function BookingPage() {
                       <div className="text-gray-500 dark:text-gray-400 text-xs">{b.mhs?.nim} • {b.mhs?.prodi}</div>
                     </td>
                     <td className="px-6 py-4 dark:text-gray-200">
-                      <a href={`https://wa.me/${b.wa}`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline">
-                        {b.wa}
-                      </a>
+                      {(() => {
+                        const formattedTanggal = (() => {
+                          try {
+                            return format(parseISO(b.tanggal), 'd MMMM yyyy', { locale: localeID });
+                          } catch (e) {
+                            return b.tanggal;
+                          }
+                        })();
+                        const cleanJam = b.jam.toLowerCase().includes('wib') ? b.jam : `${b.jam} WIB`;
+                        const waText = `Halo ${b.mhs?.nama || ''} ${b.mhs?.nim || ''}, Kami dari Admin Distribusi KTM UII. Kami ingin menginformasikan jadwal pengambilan KTM Anda yang telah terkonfirmasi pada:\n\n📅 Tanggal: ${formattedTanggal}\n⏰ Sesi Waktu: ${cleanJam}\n\nMohon hadir tepat waktu dan siapkan QR Tiket Anda. Terima kasih!`;
+                        const cleanNumber = (b.wa || '').replace(/\D/g, '');
+                        const waPhone = cleanNumber.startsWith('0') ? '62' + cleanNumber.slice(1) : cleanNumber;
+                        return (
+                          <a href={`https://wa.me/${waPhone}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
+                            {b.wa}
+                          </a>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900 dark:text-gray-100">{format(parseISO(b.tanggal), 'dd MMM yyyy', { locale: localeID })}</div>
