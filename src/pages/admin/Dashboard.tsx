@@ -8,6 +8,9 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, L
 import { isBookingExpired } from '@/lib/utils';
 
 export default function Dashboard() {
+  const [mahasiswaList, setMahasiswaList] = useState<any[]>([]);
+  const [bookingList, setBookingList] = useState<any[]>([]);
+  
   const [stats, setStats] = useState({
     totalMahasiswa: 0,
     ktmTersedia: 0,
@@ -24,45 +27,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     const unsubMhs = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
-      let tersedia = 0;
-      let belumTersedia = 0;
-      let sudahAmbil = 0;
+      const list: any[] = [];
       snap.forEach(doc => {
-        const status = doc.data().status_ktm;
-        if (status === 'Tersedia') tersedia++;
-        else if (status === 'Belum tersedia') belumTersedia++;
-        else if (status === 'Sudah diambil') sudahAmbil++;
+        list.push({ id: doc.id, ...doc.data() });
       });
-      setStats(prev => ({ 
-        ...prev, 
-        totalMahasiswa: snap.size, 
-        ktmTersedia: tersedia,
-        ktmBelumTersedia: belumTersedia,
-        ktmSudahAmbil: sudahAmbil
-      }));
+      setMahasiswaList(list);
     });
 
     const unsubBooking = onSnapshot(collection(db, 'booking'), (snap) => {
-      let sudah = 0;
-      let belum = 0;
-      let hariIni = 0;
-      const today = format(new Date(), 'yyyy-MM-dd');
-      
-      const dayCounts: Record<string, number> = {};
+      const list: any[] = [];
       const expiredToUpdate: { id: string }[] = [];
       
       snap.forEach(document => {
         const d = document.data();
+        list.push({ id: document.id, ...d });
         if (d.status === 'Belum Diambil' && isBookingExpired(d.tanggal, d.jam)) {
           expiredToUpdate.push({ id: document.id });
-        }
-        
-        if (d.status === 'Sudah Diambil') sudah++;
-        if (d.status === 'Belum Diambil') belum++;
-        if (d.tanggal === today) hariIni++;
-        
-        if (d.tanggal) {
-          dayCounts[d.tanggal] = (dayCounts[d.tanggal] || 0) + 1;
         }
       });
 
@@ -73,28 +53,8 @@ export default function Dashboard() {
         });
         batch.commit().catch(err => console.error('Failed to auto-expire bookings from dashboard snapshot:', err));
       }
-      
-      // Generate the last 7 calendar days chronologically ending on today, filling in 0 for empty dates
-      const chartData = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = format(d, 'yyyy-MM-dd');
-        chartData.push({
-          name: format(d, 'dd MMM', { locale: localeID }),
-          value: dayCounts[dateStr] || 0
-        });
-      }
-        
-      setBookingByDay(chartData);
-      
-      setStats(prev => ({ 
-        ...prev, 
-        sudahBooking: snap.size, 
-        sudahDiambil: sudah, 
-        belumDiambil: belum,
-        bookingHariIni: hariIni
-      }));
+
+      setBookingList(list);
     });
 
     // Realtime activity log
@@ -110,9 +70,83 @@ export default function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    // Create a lookup map for bookings by mahasiswa_id to handle any status mismatch dynamically
+    const bookingMap: Record<string, string> = {};
+    bookingList.forEach(b => {
+      bookingMap[b.mahasiswa_id] = b.status;
+    });
+
+    // 1. Calculate Mahasiswa Stats
+    let tersedia = 0;
+    let belumTersedia = 0;
+    let sudahAmbil = 0;
+
+    mahasiswaList.forEach(m => {
+      const status = m.status_ktm;
+      const bStatus = bookingMap[m.id];
+      
+      // A student has physically taken their KTM if:
+      // - Their status_ktm is 'Sudah diambil' OR
+      // - Their booking is marked as 'Sudah Diambil'
+      const isTaken = status === 'Sudah diambil' || bStatus === 'Sudah Diambil';
+
+      if (isTaken) {
+        sudahAmbil++;
+      } else if (status === 'Belum tersedia') {
+        belumTersedia++;
+      } else {
+        // Remaining in office/ready for pickup: status_ktm is 'Tersedia' (or fallback) and NOT yet taken
+        tersedia++;
+      }
+    });
+
+    // 2. Calculate Booking Stats
+    let sudah = 0;
+    let belum = 0;
+    let hariIni = 0;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const dayCounts: Record<string, number> = {};
+
+    bookingList.forEach(b => {
+      if (b.status === 'Sudah Diambil') sudah++;
+      if (b.status === 'Belum Diambil') belum++;
+      if (b.tanggal === today) hariIni++;
+      
+      if (b.tanggal) {
+        dayCounts[b.tanggal] = (dayCounts[b.tanggal] || 0) + 1;
+      }
+    });
+
+    // 3. Update Chart data
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      chartData.push({
+        name: format(d, 'dd MMM', { locale: localeID }),
+        value: dayCounts[dateStr] || 0
+      });
+    }
+    setBookingByDay(chartData);
+
+    // 4. Update Stats State
+    setStats({
+      totalMahasiswa: mahasiswaList.length,
+      ktmTersedia: tersedia,
+      ktmBelumTersedia: belumTersedia,
+      ktmSudahAmbil: sudahAmbil,
+      sudahBooking: bookingList.length,
+      sudahDiambil: sudah,
+      belumDiambil: belum,
+      bookingHariIni: hariIni
+    });
+  }, [mahasiswaList, bookingList]);
+
   const pieData = [
-    { name: 'Sudah Diambil', value: stats.sudahDiambil, color: '#10B981' }, // Green
-    { name: 'Siap Diambil', value: stats.ktmTersedia, color: '#3B82F6' }, // Blue
+    { name: 'Sudah Diambil', value: stats.ktmSudahAmbil, color: '#10B981' }, // Green
+    { name: 'Siap Diambil', value: stats.totalMahasiswa - stats.ktmBelumTersedia - stats.ktmSudahAmbil, color: '#3B82F6' }, // Blue
     { name: 'Belum Tersedia', value: stats.ktmBelumTersedia, color: '#F59E0B' }, // Amber
   ];
 
@@ -149,7 +183,7 @@ export default function Dashboard() {
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full opacity-50"></div>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sudah Ambil</p>
           <div className="flex items-end gap-3">
-            <h3 className="text-3xl font-bold text-green-500 dark:text-green-400">{stats.sudahDiambil}</h3>
+            <h3 className="text-3xl font-bold text-green-500 dark:text-green-400">{stats.ktmSudahAmbil}</h3>
             <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">selesai</span>
           </div>
         </div>
@@ -158,7 +192,7 @@ export default function Dashboard() {
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-full opacity-50"></div>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sisa Belum Diambil</p>
           <div className="flex items-end gap-3">
-            <h3 className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.ktmTersedia}</h3>
+            <h3 className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.totalMahasiswa - stats.ktmBelumTersedia - stats.ktmSudahAmbil}</h3>
             <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">KTM fisik</span>
           </div>
         </div>
