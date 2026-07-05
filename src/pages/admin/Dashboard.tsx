@@ -14,7 +14,9 @@ export default function Dashboard() {
     sudahBooking: 0,
     sudahDiambil: 0,
     belumDiambil: 0,
-    bookingHariIni: 0
+    bookingHariIni: 0,
+    ktmBelumTersedia: 0,
+    ktmSudahAmbil: 0
   });
   
   const [activities, setActivities] = useState<any[]>([]);
@@ -23,10 +25,21 @@ export default function Dashboard() {
   useEffect(() => {
     const unsubMhs = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
       let tersedia = 0;
+      let belumTersedia = 0;
+      let sudahAmbil = 0;
       snap.forEach(doc => {
-        if (doc.data().status_ktm === 'Tersedia') tersedia++;
+        const status = doc.data().status_ktm;
+        if (status === 'Tersedia') tersedia++;
+        else if (status === 'Belum tersedia') belumTersedia++;
+        else if (status === 'Sudah diambil') sudahAmbil++;
       });
-      setStats(prev => ({ ...prev, totalMahasiswa: snap.size, ktmTersedia: tersedia }));
+      setStats(prev => ({ 
+        ...prev, 
+        totalMahasiswa: snap.size, 
+        ktmTersedia: tersedia,
+        ktmBelumTersedia: belumTersedia,
+        ktmSudahAmbil: sudahAmbil
+      }));
     });
 
     const unsubBooking = onSnapshot(collection(db, 'booking'), (snap) => {
@@ -61,13 +74,17 @@ export default function Dashboard() {
         batch.commit().catch(err => console.error('Failed to auto-expire bookings from dashboard snapshot:', err));
       }
       
-      const chartData = Object.entries(dayCounts)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .slice(-7) // Last 7 days
-        .map(([date, count]) => ({
-          name: format(new Date(date), 'dd MMM', { locale: localeID }),
-          value: count
-        }));
+      // Generate the last 7 calendar days chronologically ending on today, filling in 0 for empty dates
+      const chartData = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = format(d, 'yyyy-MM-dd');
+        chartData.push({
+          name: format(d, 'dd MMM', { locale: localeID }),
+          value: dayCounts[dateStr] || 0
+        });
+      }
         
       setBookingByDay(chartData);
       
@@ -93,11 +110,10 @@ export default function Dashboard() {
     };
   }, []);
 
-  const sisaBelumDiambil = stats.ktmTersedia - stats.sudahDiambil;
-  
   const pieData = [
     { name: 'Sudah Diambil', value: stats.sudahDiambil, color: '#10B981' }, // Green
-    { name: 'Sisa Belum Diambil', value: sisaBelumDiambil > 0 ? sisaBelumDiambil : 0, color: '#F59E0B' }, // Amber
+    { name: 'Siap Diambil', value: stats.ktmTersedia, color: '#3B82F6' }, // Blue
+    { name: 'Belum Tersedia', value: stats.ktmBelumTersedia, color: '#F59E0B' }, // Amber
   ];
 
   return (
@@ -142,7 +158,7 @@ export default function Dashboard() {
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-full opacity-50"></div>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sisa Belum Diambil</p>
           <div className="flex items-end gap-3">
-            <h3 className="text-3xl font-bold text-purple-600 dark:text-purple-400">{sisaBelumDiambil}</h3>
+            <h3 className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.ktmTersedia}</h3>
             <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">KTM fisik</span>
           </div>
         </div>
@@ -182,8 +198,9 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400 px-8 mt-2">
-                <span>Total KTM Tersedia: <strong className="text-gray-900 dark:text-gray-100">{stats.ktmTersedia}</strong></span>
+              <div className="flex flex-col sm:flex-row justify-between items-center text-xs text-gray-500 dark:text-gray-400 gap-2 px-4 sm:px-8 mt-2">
+                <span>Siap Diambil (di Laci): <strong className="text-gray-900 dark:text-gray-100">{stats.ktmTersedia}</strong></span>
+                <span>Fisik Belum Tersedia: <strong className="text-gray-900 dark:text-gray-100">{stats.ktmBelumTersedia}</strong></span>
                 <span>Total Mahasiswa: <strong className="text-gray-900 dark:text-gray-100">{stats.totalMahasiswa}</strong></span>
               </div>
             </CardContent>
@@ -238,11 +255,11 @@ export default function Dashboard() {
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      </div>
                      <div>
-                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight">
-                         KTM diserahkan
+                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                         {act.nama || 'KTM diserahkan'}
                        </p>
-                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">NIM: <span className="font-medium text-gray-700 dark:text-gray-300">{act.nim}</span></p>
-                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">NIM: <span className="font-mono text-gray-750 dark:text-gray-350 font-medium">{act.nim}</span></p>
+                       <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
                          {act.waktu_pengambilan ? format(act.waktu_pengambilan.toDate(), 'HH:mm - dd MMM yyyy', { locale: localeID }) : ''}
                        </p>
                      </div>

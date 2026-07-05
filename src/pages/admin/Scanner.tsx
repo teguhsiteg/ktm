@@ -1,15 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, serverTimestamp, deleteDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { Booking, Mahasiswa } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Scan, AlertCircle, RotateCcw, Trash2, Clock, Check, ArrowRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Scan, AlertCircle, RotateCcw, Trash2, Clock, Check, ArrowRight, Search, FileSpreadsheet, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { isBookingNotStartedYet, isBookingExpired } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 type ScannedLog = {
   id: string; // distribusi id
@@ -30,10 +32,21 @@ export default function ScannerPage() {
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
   const [manualInput, setManualInput] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const autoResetTimeoutRef = useRef<any>(null);
 
   const prevQueueLengthRef = useRef(0);
+
+  const filteredHistoryLogs = useMemo(() => {
+    if (!historySearch.trim()) return recentLogs;
+    const s = historySearch.toLowerCase();
+    return recentLogs.filter(log => 
+      log.nama?.toLowerCase().includes(s) || 
+      log.nim?.toLowerCase().includes(s) ||
+      log.booking_id?.toLowerCase().includes(s)
+    );
+  }, [recentLogs, historySearch]);
 
   // Keep references to prevent stale closures in the scanner callback
   const statusRef = useRef(status);
@@ -86,7 +99,7 @@ export default function ScannerPage() {
     const q = query(
       collection(db, 'distribusi'),
       orderBy('waktu_pengambilan', 'desc'),
-      limit(20)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -488,6 +501,62 @@ export default function ScannerPage() {
     }
   };
 
+  const handleSelectHistoryLog = async (log: ScannedLog) => {
+    setStatus('loading');
+    try {
+      const bDoc = await getDoc(doc(db, 'booking', log.booking_id));
+      if (bDoc.exists()) {
+        const bData = bDoc.data() as Booking;
+        bData.id = bDoc.id;
+        setBooking(bData);
+        
+        const mDoc = await getDoc(doc(db, 'mahasiswa', bData.mahasiswa_id));
+        if (mDoc.exists()) {
+          setMahasiswa(mDoc.data() as Mahasiswa);
+        }
+        
+        setStatus('used');
+        setIsEarly(false);
+        toast.info(`Menampilkan detail riwayat KTM ${log.nama}`);
+      } else {
+        toast.error('Data booking tidak ditemukan');
+        setStatus('idle');
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal memuat detail riwayat');
+      setStatus('idle');
+    }
+  };
+
+  const handleExportHistory = () => {
+    if (recentLogs.length === 0) {
+      toast.error('Tidak ada data riwayat untuk diexport');
+      return;
+    }
+    
+    try {
+      const dataToExport = recentLogs.map((log, index) => ({
+        'No': index + 1,
+        'Booking ID': log.booking_id,
+        'NIM': log.nim,
+        'Nama': log.nama,
+        'Waktu Penyerahan': format(log.waktu instanceof Date ? log.waktu : new Date(log.waktu), 'yyyy-MM-dd HH:mm:ss')
+      }));
+      
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Distribusi');
+      
+      const fileName = `Riwayat_Distribusi_KTM_Scanner_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success('Berhasil mengexport data riwayat ke Excel!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Gagal mengexport data riwayat');
+    }
+  };
+
   const resetScanner = () => {
     if (autoResetTimeoutRef.current) {
       clearTimeout(autoResetTimeoutRef.current);
@@ -754,45 +823,89 @@ export default function ScannerPage() {
                   </ul>
                 )
               ) : (
-                recentLogs.length === 0 ? (
-                  <div className="min-h-[250px] flex flex-col items-center justify-center p-6 text-center text-gray-500 dark:text-gray-400">
-                    <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl mb-3 border border-gray-100 dark:border-gray-800 shadow-xs">
-                      <CheckCircle2 className="w-8 h-8 opacity-30 text-gray-400" />
+                <div className="flex flex-col h-full">
+                  {/* Search and Export Action Bar */}
+                  <div className="p-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-zinc-800/20 flex flex-col sm:flex-row gap-2 items-center justify-between">
+                    <div className="relative w-full sm:max-w-[200px]">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder="Cari nama atau NIM..."
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        className="pl-8 h-8 text-xs rounded-xl dark:bg-[#2A2A2A] border-gray-200 dark:border-gray-700 w-full font-semibold placeholder:text-gray-400"
+                      />
                     </div>
-                    <p className="font-bold text-xs text-gray-800 dark:text-gray-200">Riwayat Kosong</p>
-                    <p className="text-[10px] text-gray-400 mt-1">Belum ada penyerahan KTM.</p>
+                    <Button
+                      onClick={handleExportHistory}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-xl text-xs font-bold border-gray-200 dark:border-gray-750 flex items-center gap-1.5 w-full sm:w-auto"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Export Excel</span>
+                    </Button>
                   </div>
-                ) : (
-                  <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {recentLogs.map((log) => (
-                      <li key={log.id} className="p-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/10 transition-colors flex items-center justify-between gap-3 group">
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <div className="bg-emerald-50 dark:bg-emerald-950/20 p-2 rounded-lg text-emerald-600 dark:text-emerald-400 mt-0.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+
+                  {filteredHistoryLogs.length === 0 ? (
+                    <div className="min-h-[250px] flex flex-col items-center justify-center p-6 text-center text-gray-500 dark:text-gray-400">
+                      <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl mb-3 border border-gray-100 dark:border-gray-800 shadow-xs">
+                        <Search className="w-8 h-8 opacity-30 text-gray-400" />
+                      </div>
+                      <p className="font-bold text-xs text-gray-800 dark:text-gray-200">Tidak Ada Hasil</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Coba cari dengan kata kunci lain.</p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800 max-h-[350px] overflow-y-auto">
+                      {filteredHistoryLogs.map((log) => (
+                        <li key={log.id} className="p-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/10 transition-colors flex items-center justify-between gap-2.5 group">
+                          <div 
+                            className="flex items-start gap-2.5 min-w-0 flex-1 cursor-pointer"
+                            onClick={() => handleSelectHistoryLog(log)}
+                            title="Klik untuk lihat detail di papan verifikasi"
+                          >
+                            <div className="bg-emerald-50 dark:bg-emerald-950/20 p-2 rounded-lg text-emerald-600 dark:text-emerald-400 mt-0.5 group-hover:scale-105 transition-transform shrink-0">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-extrabold text-gray-900 dark:text-gray-100 truncate group-hover:text-[#005BAC] dark:group-hover:text-[#8AB4F8] transition-colors">{log.nama}</p>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">{log.nim}</p>
+                              <p className="text-[9px] text-gray-450 dark:text-gray-500 mt-0.5 flex items-center gap-1 font-medium flex-wrap">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>Selesai: {format(log.waktu instanceof Date ? log.waktu : new Date(log.waktu), 'HH:mm:ss')}</span>
+                                {log.booking_id && (
+                                  <span className="text-[8px] px-1 py-0.1 bg-gray-100 dark:bg-zinc-800 text-gray-400 rounded">ID: {log.booking_id.substring(0, 5)}...</span>
+                                )}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-extrabold text-gray-900 dark:text-gray-100 truncate">{log.nama}</p>
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">{log.nim}</p>
-                            <p className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5 flex items-center gap-1 font-medium">
-                              <Clock className="w-2.5 h-2.5" />
-                              Selesai: {format(log.waktu instanceof Date ? log.waktu : new Date(log.waktu), 'HH:mm:ss')}
-                            </p>
+                          
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSelectHistoryLog(log)}
+                              className="text-gray-400 hover:text-[#005BAC] dark:hover:text-[#8AB4F8] hover:bg-gray-100 dark:hover:bg-zinc-800 h-7 w-7 p-0 rounded-lg shrink-0"
+                              title="Lihat Detail"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleUndo(log)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 dark:text-red-400 h-7 px-2 rounded-lg flex items-center gap-1 font-bold text-[10px] transition-all shrink-0"
+                              title="Batalkan Penyerahan"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span className="hidden sm:inline">Batal</span>
+                            </Button>
                           </div>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleUndo(log)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 dark:text-red-400 h-7 px-2 rounded-lg flex items-center gap-1 font-bold text-[10px] transition-all"
-                          title="Batalkan Penyerahan"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>Batal</span>
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
