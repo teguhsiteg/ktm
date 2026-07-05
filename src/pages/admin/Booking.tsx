@@ -40,15 +40,6 @@ export default function BookingPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   useEffect(() => {
     // Fetch mahasiswa mapping first
     const unsubMhs = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
@@ -351,17 +342,6 @@ export default function BookingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-            {/* Real-time Clock */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#2A2A2A] rounded-xl border border-gray-100 dark:border-gray-800/80 self-start sm:self-auto">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 font-mono">
-                {format(currentTime, 'EEEE, d MMMM yyyy - HH:mm:ss', { locale: localeID })}
-              </span>
-            </div>
-
             <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm" className="rounded-xl w-full sm:w-auto">
               <Download className="w-4 h-4 mr-2" />
               {exporting ? 'Exporting...' : 'Export Filtered Data'}

@@ -3,6 +3,8 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { format } from 'date-fns';
+import { id as localeID } from 'date-fns/locale';
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -11,6 +13,14 @@ export default function AdminLayout() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('admin_theme') === 'dark';
   });
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -127,6 +137,15 @@ export default function AdminLayout() {
           <h1 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">KTM Admin</h1>
         </div>
         <div className="flex items-center space-x-1.5">
+          {/* Real-time Clock for Mobile Header */}
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 dark:bg-zinc-800 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 font-mono">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            <span>{format(currentTime, 'HH:mm:ss')}</span>
+          </div>
+
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 dark:text-gray-400 transition-colors"
@@ -145,7 +164,7 @@ export default function AdminLayout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Desktop Topbar - hidden on mobile */}
         <header className="h-[72px] bg-white/50 dark:bg-[#121212]/50 backdrop-blur-md border-b border-gray-200 dark:border-gray-800/60 px-8 hidden md:flex items-center justify-between sticky top-0 z-10 transition-colors duration-200">
           <div>
@@ -154,6 +173,17 @@ export default function AdminLayout() {
             </h2>
           </div>
           <div className="flex items-center space-x-3">
+             {/* Real-time Clock for Desktop Topbar */}
+             <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A] text-gray-700 dark:text-gray-300 transition-all shadow-sm">
+               <span className="relative flex h-2 w-2 shrink-0">
+                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+               </span>
+               <span className="text-xs font-bold font-mono">
+                 {format(currentTime, 'EEEE, d MMMM yyyy - HH:mm:ss', { locale: localeID })}
+               </span>
+             </div>
+
              <button
                onClick={() => setDarkMode(!darkMode)}
                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1A1A1A] hover:bg-gray-50 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-300 transition-all shadow-sm"
