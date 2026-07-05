@@ -124,20 +124,19 @@ export default function SchedulePage() {
       const newBookingId = generateBookingId();
 
       await runTransaction(db, async (transaction) => {
-        // If rescheduling, decrement old schedule's booked_count
-        if (isReschedule && oldJadwalId) {
-          const oldJRef = doc(db, 'jadwal', oldJadwalId);
-          const oldJDoc = await transaction.get(oldJRef);
-          if (oldJDoc.exists()) {
-            const oldData = oldJDoc.data() as Jadwal;
-            const oldBooked = oldData.booked_count || 0;
-            transaction.update(oldJRef, { booked_count: Math.max(0, oldBooked - 1) });
-          }
-        }
-
-        const jDoc = await transaction.get(jRef);
-        if (!jDoc.exists()) throw new Error('Jadwal tidak ditemukan');
+        // Prepare document references
+        const oldJRef = (isReschedule && oldJadwalId) ? doc(db, 'jadwal', oldJadwalId) : null;
         
+        // 1. PERFORM ALL READS FIRST
+        let oldJDoc = null;
+        if (oldJRef) {
+          oldJDoc = await transaction.get(oldJRef);
+        }
+        
+        const jDoc = await transaction.get(jRef);
+        
+        // 2. RUN VALIDATIONS & COMPUTE NEW STATES
+        if (!jDoc.exists()) throw new Error('Jadwal tidak ditemukan');
         const currentData = jDoc.data() as Jadwal;
         const currentBooked = currentData.booked_count || 0;
         
@@ -145,7 +144,20 @@ export default function SchedulePage() {
           throw new Error('Jadwal penuh');
         }
 
-        // Add to booked count
+        let oldBooked = 0;
+        let oldJDocExists = false;
+        if (oldJDoc && oldJDoc.exists()) {
+          oldJDocExists = true;
+          const oldData = oldJDoc.data() as Jadwal;
+          oldBooked = oldData.booked_count || 0;
+        }
+
+        // 3. PERFORM ALL WRITES LAST
+        if (oldJRef && oldJDocExists) {
+          transaction.update(oldJRef, { booked_count: Math.max(0, oldBooked - 1) });
+        }
+
+        // Add to booked count of the new schedule
         transaction.update(jRef, { booked_count: currentBooked + 1 });
         
         if (isReschedule && oldBookingId) {
