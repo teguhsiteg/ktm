@@ -19,7 +19,7 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   
-  const [filter, setFilter] = useState({ search: '', status: 'Semua', tanggal: '', sesi: 'Semua', prodi: 'Semua' });
+  const [filter, setFilter] = useState({ search: '', nim: '', status: 'Semua', tanggal: '', sesi: 'Semua', prodi: 'Semua' });
 
   const uniqueSessions = useMemo(() => {
     const sessions = bookings.map(b => b.jam).filter(Boolean);
@@ -103,6 +103,11 @@ export default function BookingPage() {
         if (filter.tanggal && b.tanggal !== filter.tanggal) return false;
         if (filter.sesi && filter.sesi !== 'Semua' && b.jam !== filter.sesi) return false;
         if (filter.prodi && filter.prodi !== 'Semua' && b.mhs?.prodi !== filter.prodi) return false;
+        if (filter.nim) {
+          const n = filter.nim.toLowerCase();
+          const matchNim = b.mhs?.nim?.toLowerCase().includes(n);
+          if (!matchNim) return false;
+        }
         if (filter.search) {
           const s = filter.search.toLowerCase();
           const matchName = b.mhs?.nama?.toLowerCase().includes(s);
@@ -138,6 +143,21 @@ export default function BookingPage() {
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
+      });
+    } else {
+      // Default sorting: Sort chronologically by schedule date (tanggal) asc, then session (jam) asc, then student name asc
+      result.sort((a, b) => {
+        const dateA = a.tanggal || '';
+        const dateB = b.tanggal || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+        const timeA = a.jam || '';
+        const timeB = b.jam || '';
+        if (timeA !== timeB) return timeA.localeCompare(timeB);
+
+        const nameA = a.mhs?.nama || '';
+        const nameB = b.mhs?.nama || '';
+        return nameA.localeCompare(nameB);
       });
     }
 
@@ -255,8 +275,22 @@ export default function BookingPage() {
         mhs: mahasiswaMap[b.mahasiswa_id]
       }));
 
-      const sudahDiambilList = allBookingsWithMhs.filter(b => b.status === 'Sudah Diambil');
-      const belumDiambilList = allBookingsWithMhs.filter(b => b.status !== 'Sudah Diambil');
+      const sortFunction = (a: any, b: any) => {
+        const dateA = a.tanggal || '';
+        const dateB = b.tanggal || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+        const timeA = a.jam || '';
+        const timeB = b.jam || '';
+        if (timeA !== timeB) return timeA.localeCompare(timeB);
+
+        const nameA = a.mhs?.nama || '';
+        const nameB = b.mhs?.nama || '';
+        return nameA.localeCompare(nameB);
+      };
+
+      const sudahDiambilList = allBookingsWithMhs.filter(b => b.status === 'Sudah Diambil').sort(sortFunction);
+      const belumDiambilList = allBookingsWithMhs.filter(b => b.status !== 'Sudah Diambil').sort(sortFunction);
 
       const formatRow = (b: any) => ({
         'Booking ID': b.booking_id,
@@ -310,11 +344,19 @@ export default function BookingPage() {
 
       <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <Input 
-              placeholder="Cari NIM, Nama..." 
+              placeholder="Cari Nama / ID..." 
               value={filter.search}
               onChange={e => setFilter({ ...filter, search: e.target.value })}
+              className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Input 
+              placeholder="Cari NIM..." 
+              value={filter.nim}
+              onChange={e => setFilter({ ...filter, nim: e.target.value })}
               className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
             />
           </div>
@@ -338,13 +380,13 @@ export default function BookingPage() {
               ))}
             </select>
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <select 
-              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+              className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
               value={filter.sesi}
               onChange={e => setFilter({ ...filter, sesi: e.target.value })}
             >
-              <option value="Semua" className="dark:bg-[#1E1E1E]">Semua Sesi</option>
+              <option value="Semua" className="dark:bg-[#1E1E1E]">Sesi</option>
               {uniqueSessions.map(session => (
                 <option key={session} value={session} className="dark:bg-[#1E1E1E]">{session}</option>
               ))}
