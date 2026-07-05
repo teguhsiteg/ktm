@@ -31,6 +31,7 @@ export default function ScannerPage() {
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
   const [manualInput, setManualInput] = useState('');
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const autoResetTimeoutRef = useRef<any>(null);
 
   const prevQueueLengthRef = useRef(0);
 
@@ -45,6 +46,14 @@ export default function ScannerPage() {
   useEffect(() => {
     scanResultRef.current = scanResult;
   }, [scanResult]);
+
+  useEffect(() => {
+    return () => {
+      if (autoResetTimeoutRef.current) {
+        clearTimeout(autoResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const q = query(
@@ -432,6 +441,11 @@ export default function ScannerPage() {
       setIsEarly(false);
       setBooking({ ...booking, status: 'Sudah Diambil' });
       toast.success(`KTM ${mahasiswa.nama} berhasil diserahkan`);
+
+      // Automatically reset scanner to idle state after 1.5 seconds so admin doesn't have to click anything
+      autoResetTimeoutRef.current = setTimeout(() => {
+        resetScanner();
+      }, 1500);
     } catch (e) {
       console.error(e);
       toast.error('Gagal memproses penyerahan KTM');
@@ -475,6 +489,10 @@ export default function ScannerPage() {
   };
 
   const resetScanner = () => {
+    if (autoResetTimeoutRef.current) {
+      clearTimeout(autoResetTimeoutRef.current);
+      autoResetTimeoutRef.current = null;
+    }
     setScanResult(null);
     setBooking(null);
     setMahasiswa(null);
@@ -527,6 +545,11 @@ export default function ScannerPage() {
       if (booking && booking.id === item.booking_id) {
         setStatus('used');
         setBooking({ ...booking, status: 'Sudah Diambil' });
+
+        // Automatically reset scanner to idle state after 1.5 seconds so admin doesn't have to click anything
+        autoResetTimeoutRef.current = setTimeout(() => {
+          resetScanner();
+        }, 1500);
       }
 
       toast.success(`KTM ${item.nama} berhasil diserahkan!`);
@@ -940,22 +963,29 @@ export default function ScannerPage() {
                     </div>
                   </div>
 
-                  <div className="w-full max-w-md mx-auto pt-4 flex gap-3">
-                    <Button variant="outline" size="sm" className="flex-1 bg-white dark:bg-[#2A2A2A] text-gray-700 dark:text-gray-300 rounded-xl h-11 font-bold shadow-sm" onClick={resetScanner}>
-                      Batal / Reset
-                    </Button>
-                    {status === 'valid' && (
-                      <Button 
-                        className={`flex-1 text-white font-extrabold rounded-xl h-11 shadow-md transition-transform active:scale-95 ${
-                          isEarly 
-                            ? 'bg-amber-600 hover:bg-amber-700' 
-                            : 'bg-emerald-600 hover:bg-emerald-700'
-                        }`} 
-                        onClick={handleSerahkan} 
-                        disabled={submitting}
-                      >
-                        {submitting ? 'Memproses...' : 'Serahkan KTM'}
+                  <div className="w-full max-w-md mx-auto pt-4 flex flex-col gap-2">
+                    <div className="flex gap-3 w-full">
+                      <Button variant="outline" size="sm" className="flex-1 bg-white dark:bg-[#2A2A2A] text-gray-700 dark:text-gray-300 rounded-xl h-11 font-bold shadow-sm" onClick={resetScanner}>
+                        {status === 'used' ? 'Reset Sekarang' : 'Batal / Reset'}
                       </Button>
+                      {status === 'valid' && (
+                        <Button 
+                          className={`flex-1 text-white font-extrabold rounded-xl h-11 shadow-md transition-transform active:scale-95 ${
+                            isEarly 
+                              ? 'bg-amber-600 hover:bg-amber-700' 
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`} 
+                          onClick={handleSerahkan} 
+                          disabled={submitting}
+                        >
+                          {submitting ? 'Memproses...' : 'Serahkan KTM'}
+                        </Button>
+                      )}
+                    </div>
+                    {status === 'used' && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium animate-pulse">
+                        Mengatur ulang scanner otomatis dalam 1.5 detik...
+                      </p>
                     )}
                   </div>
                 </div>

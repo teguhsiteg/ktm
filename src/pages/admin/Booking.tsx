@@ -8,7 +8,7 @@ import { Booking, Mahasiswa } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle } from 'lucide-react';
+import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
@@ -39,6 +39,15 @@ export default function BookingPage() {
   // Bulk Selection States
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     // Fetch mahasiswa mapping first
@@ -327,17 +336,38 @@ export default function BookingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Data Booking</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Menampilkan {currentData.length} dari {processedData.length} data
-          </p>
+      <div className="bg-white dark:bg-[#1E1E1E] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 w-full justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 dark:bg-[#005BAC]/10 text-[#005BAC] dark:text-[#8AB4F8] rounded-xl">
+              <Clock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Data Booking</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Menampilkan {currentData.length} dari {processedData.length} data
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            {/* Real-time Clock */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#2A2A2A] rounded-xl border border-gray-100 dark:border-gray-800/80 self-start sm:self-auto">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 font-mono">
+                {format(currentTime, 'EEEE, d MMMM yyyy - HH:mm:ss', { locale: localeID })}
+              </span>
+            </div>
+
+            <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm" className="rounded-xl w-full sm:w-auto">
+              <Download className="w-4 h-4 mr-2" />
+              {exporting ? 'Exporting...' : 'Export Filtered Data'}
+            </Button>
+          </div>
         </div>
-        <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm">
-          <Download className="w-4 h-4 mr-2" />
-          {exporting ? 'Exporting...' : 'Export Filtered Data'}
-        </Button>
       </div>
 
       <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800">
