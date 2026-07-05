@@ -52,9 +52,9 @@ export default function AdminLayout() {
   ];
 
   return (
-    <div className="h-screen md:h-screen w-full overflow-hidden bg-[#F8F9FA] dark:bg-[#121212] flex flex-col md:flex-row font-['Roboto',_sans-serif] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">
+    <div className="h-[100dvh] w-full overflow-hidden bg-[#F8F9FA] dark:bg-[#121212] flex flex-col md:flex-row font-['Roboto',_sans-serif] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">
       {/* Sidebar Modern SaaS style - hidden on mobile, visible on desktop */}
-      <aside className="w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col hidden md:flex h-screen sticky top-0 transition-colors duration-200">
+      <aside className="w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col hidden md:flex h-full sticky top-0 transition-colors duration-200">
         <div className="p-6 flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800/60">
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
             <img 
@@ -181,7 +181,7 @@ export default function AdminLayout() {
         </div>
 
         {/* Mobile Bottom Navigation - only visible on mobile/tablets */}
-        <nav className="h-[70px] flex-shrink-0 bg-white/90 dark:bg-[#1A1A1A]/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800/60 flex md:hidden items-center justify-around px-2 pb-safe z-20 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.2)] transition-colors duration-200">
+        <nav className="h-[calc(70px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] flex-shrink-0 bg-white/90 dark:bg-[#1A1A1A]/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800/60 flex md:hidden items-center justify-around px-2 z-20 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.2)] transition-colors duration-200">
           {menu.map(item => {
             const Icon = item.icon;
             const active = location.pathname.startsWith(item.path);
