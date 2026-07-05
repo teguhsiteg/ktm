@@ -19,7 +19,7 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   
-  const [filter, setFilter] = useState({ search: '', nim: '', status: 'Semua', tanggal: '', sesi: 'Semua', prodi: 'Semua' });
+  const [filter, setFilter] = useState({ search: '', status: 'Semua', tanggal: '', sesi: 'Semua', prodi: 'Semua' });
 
   const uniqueSessions = useMemo(() => {
     const sessions = bookings.map(b => b.jam).filter(Boolean);
@@ -103,11 +103,6 @@ export default function BookingPage() {
         if (filter.tanggal && b.tanggal !== filter.tanggal) return false;
         if (filter.sesi && filter.sesi !== 'Semua' && b.jam !== filter.sesi) return false;
         if (filter.prodi && filter.prodi !== 'Semua' && b.mhs?.prodi !== filter.prodi) return false;
-        if (filter.nim) {
-          const n = filter.nim.toLowerCase();
-          const matchNim = b.mhs?.nim?.toLowerCase().includes(n);
-          if (!matchNim) return false;
-        }
         if (filter.search) {
           const s = filter.search.toLowerCase();
           const matchName = b.mhs?.nama?.toLowerCase().includes(s);
@@ -126,6 +121,9 @@ export default function BookingPage() {
         if (sortConfig.key === 'booking_id') {
           aValue = a.booking_id || '';
           bValue = b.booking_id || '';
+        } else if (sortConfig.key === 'nim') {
+          aValue = a.mhs?.nim || '';
+          bValue = b.mhs?.nim || '';
         } else if (sortConfig.key === 'mahasiswa') {
           aValue = a.mhs?.nama || '';
           bValue = b.mhs?.nama || '';
@@ -344,19 +342,11 @@ export default function BookingPage() {
 
       <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800">
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-2">
+          <div className="md:col-span-3">
             <Input 
-              placeholder="Cari Nama / ID..." 
+              placeholder="Cari Nama, NIM, ID..." 
               value={filter.search}
               onChange={e => setFilter({ ...filter, search: e.target.value })}
-              className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Input 
-              placeholder="Cari NIM..." 
-              value={filter.nim}
-              onChange={e => setFilter({ ...filter, nim: e.target.value })}
               className="w-full dark:bg-[#2A2A2A] dark:border-gray-800"
             />
           </div>
@@ -404,7 +394,7 @@ export default function BookingPage() {
               <option value="Hangus" className="dark:bg-[#1E1E1E]">Hangus</option>
             </select>
           </div>
-          <div className="md:col-span-1">
+          <div className="md:col-span-2">
             <select 
               value={itemsPerPage}
               onChange={e => setItemsPerPage(e.target.value as any)}
@@ -480,8 +470,16 @@ export default function BookingPage() {
                 <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('booking_id')}>
                   Booking ID <SortIndicator columnKey="booking_id" />
                 </th>
-                <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('mahasiswa')}>
-                  Mahasiswa <SortIndicator columnKey="mahasiswa" />
+                <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <span className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1" onClick={() => handleSort('mahasiswa')}>
+                      Nama <SortIndicator columnKey="mahasiswa" />
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-700">|</span>
+                    <span className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1" onClick={() => handleSort('nim')}>
+                      NIM <SortIndicator columnKey="nim" />
+                    </span>
+                  </div>
                 </th>
                 <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('wa')}>
                   WA <SortIndicator columnKey="wa" />
