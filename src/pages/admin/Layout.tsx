@@ -66,7 +66,7 @@ export default function AdminLayout() {
       {/* Sidebar Modern SaaS style - hidden on mobile, visible on desktop */}
       <aside className="w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col hidden md:flex h-full sticky top-0 transition-colors duration-200">
         <div className="p-6 flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800/60">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
             <img 
               src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
               alt="Logo UII" 
@@ -90,7 +90,7 @@ export default function AdminLayout() {
                 to={item.path}
                 className={`group flex items-center px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   active 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' 
+                    ? 'bg-[#005BAC] text-white shadow-md shadow-[#005BAC]/20' 
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800/50 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}
               >
@@ -105,7 +105,7 @@ export default function AdminLayout() {
         
         <div className="p-4 border-t border-gray-200 dark:border-gray-800/60">
           <div className="flex items-center gap-3 px-3 py-3 bg-gray-50 dark:bg-zinc-800/50 rounded-xl mb-2">
-            <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm shrink-0">
+            <div className="w-9 h-9 bg-[#E8F0FE] dark:bg-[#005BAC]/15 rounded-lg flex items-center justify-center text-[#005BAC] dark:text-[#8AB4F8] font-bold text-sm shrink-0">
               AD
             </div>
             <div className="flex-1 min-w-0">
@@ -126,7 +126,7 @@ export default function AdminLayout() {
       {/* Mobile Header - only visible on mobile */}
       <header className="h-[60px] flex-shrink-0 bg-white dark:bg-[#1A1A1A] border-b border-gray-200 dark:border-gray-800/60 px-4 flex md:hidden items-center justify-between z-20 transition-colors duration-200">
         <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
             <img 
               src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
               alt="Logo UII" 
@@ -220,14 +220,14 @@ export default function AdminLayout() {
                 key={item.path}
                 to={item.path}
                 className={`group relative flex flex-col items-center justify-center flex-1 h-full pt-1 transition-all duration-200 ${
-                  active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  active ? 'text-[#005BAC] dark:text-[#8AB4F8]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}
               >
                 {active && (
-                  <div className="absolute top-0 w-8 h-1 bg-blue-600 dark:bg-blue-400 rounded-b-full"></div>
+                  <div className="absolute top-0 w-8 h-1 bg-[#005BAC] dark:bg-[#8AB4F8] rounded-b-full"></div>
                 )}
                 <div className={`p-1.5 rounded-xl mb-0.5 transition-all duration-200 ${
-                  active ? 'bg-blue-50 dark:bg-blue-500/10 scale-110' : 'bg-transparent group-hover:bg-gray-50 dark:group-hover:bg-zinc-800/50'
+                  active ? 'bg-[#E8F0FE] dark:bg-[#005BAC]/15 scale-110' : 'bg-transparent group-hover:bg-gray-50 dark:group-hover:bg-zinc-800/50'
                 }`}>
                   <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 </div>
