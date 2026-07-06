@@ -183,25 +183,16 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#1E1E1E] p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all hover:shadow-md">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-full opacity-50"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sudah Booking</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Total Mahasiswa</p>
           <div className="flex items-end gap-3">
-            <h3 className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.sudahBooking}</h3>
-            <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">mahasiswa</span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#1E1E1E] p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all hover:shadow-md">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-full opacity-50"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Belum Ambil (Antrean)</p>
-          <div className="flex items-end gap-3">
-            <h3 className="text-3xl font-bold text-amber-500 dark:text-amber-400">{stats.belumDiambil}</h3>
-            <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">tiket</span>
+            <h3 className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalMahasiswa}</h3>
+            <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">orang</span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-[#1E1E1E] p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all hover:shadow-md">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full opacity-50"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sudah Ambil</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">KTM Sudah Diambil</p>
           <div className="flex items-end gap-3">
             <h3 className="text-3xl font-bold text-green-500 dark:text-green-400">{stats.ktmSudahAmbil}</h3>
             <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">selesai</span>
@@ -210,10 +201,19 @@ export default function Dashboard() {
 
         <div className="bg-white dark:bg-[#1E1E1E] p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all hover:shadow-md">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-full opacity-50"></div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Sisa Belum Diambil</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">KTM Siap Diambil (Sisa Fisik)</p>
           <div className="flex items-end gap-3">
             <h3 className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.totalMahasiswa - stats.ktmBelumTersedia - stats.ktmSudahAmbil}</h3>
             <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">KTM fisik</span>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#1E1E1E] p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden transition-all hover:shadow-md">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-full opacity-50"></div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">Antrean Booking Aktif</p>
+          <div className="flex items-end gap-3">
+            <h3 className="text-3xl font-bold text-amber-500 dark:text-amber-400">{stats.belumDiambil}</h3>
+            <span className="text-sm text-gray-400 dark:text-gray-500 mb-1">tiket</span>
           </div>
         </div>
       </div>
