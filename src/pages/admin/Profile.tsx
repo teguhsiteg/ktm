@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { UserCircle } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { adminData, currentUser } = useAdmin();
+  const { adminData, currentUser, adminId } = useAdmin();
   const [nama, setNama] = useState('');
   const [fakultas, setFakultas] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,9 +26,10 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!currentUser) return;
     
+    const idToUpdate = adminId || currentUser.uid;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'admins', currentUser.uid), {
+      await updateDoc(doc(db, 'admins', idToUpdate), {
         nama,
         fakultas
       });

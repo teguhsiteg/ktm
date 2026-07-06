@@ -17,27 +17,33 @@ interface AdminContextType {
   adminData: AdminData | null;
   loadingAdmin: boolean;
   currentUser: User | null;
+  adminId: string | null;
 }
 
-const AdminContext = createContext<AdminContextType>({ adminData: null, loadingAdmin: true, currentUser: null });
+const AdminContext = createContext<AdminContextType>({ adminData: null, loadingAdmin: true, currentUser: null, adminId: null });
 
 export const useAdmin = () => useContext(AdminContext);
 
 export function AdminProvider({ children }: { children: ReactNode }) {
   const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const [adminId, setAdminId] = useState<string | null>(null);
   const [loadingAdmin, setLoadingAdmin] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adminIdRef = useRef<string | null>(null);
 
   // Auto Logout setelah 15 menit tidak ada aktivitas
   const resetTimer = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(async () => {
       if (auth.currentUser) {
-        if (auth.currentUser) {
-          await updateDoc(doc(db, 'admins', auth.currentUser.uid), {
+        const idToUpdate = adminIdRef.current || auth.currentUser.uid;
+        try {
+          await updateDoc(doc(db, 'admins', idToUpdate), {
             last_logout: new Date().toISOString()
           });
+        } catch (e) {
+          console.error('Failed to update last_logout on auto logout:', e);
         }
         await signOut(auth);
         toast.info('Sesi Anda telah berakhir karena tidak ada aktivitas.');
@@ -107,6 +113,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        setAdminId(activeDocRef.id);
+        adminIdRef.current = activeDocRef.id;
+
         // Listen for live updates using the resolved document reference
         unsubSnapshot = onSnapshot(activeDocRef, (snap) => {
           if (snap.exists()) {
@@ -119,6 +128,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
       } else {
         setAdminData(null);
+        setAdminId(null);
+        adminIdRef.current = null;
         setLoadingAdmin(false);
         if (unsubSnapshot) unsubSnapshot();
       }
@@ -131,7 +142,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AdminContext.Provider value={{ adminData, loadingAdmin, currentUser }}>
+    <AdminContext.Provider value={{ adminData, loadingAdmin, currentUser, adminId }}>
       {children}
     </AdminContext.Provider>
   );

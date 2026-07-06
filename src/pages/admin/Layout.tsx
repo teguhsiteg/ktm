@@ -17,7 +17,7 @@ export default function AdminLayout() {
     return localStorage.getItem('admin_theme') === 'dark';
   });
   const [currentTime, setCurrentTime] = useState(new Date());
-  const { adminData, loadingAdmin } = useAdmin();
+  const { adminData, loadingAdmin, adminId } = useAdmin();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -51,7 +51,8 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     if (auth.currentUser) {
       try {
-        await updateDoc(doc(db, 'admins', auth.currentUser.uid), {
+        const idToUpdate = adminId || auth.currentUser.uid;
+        await updateDoc(doc(db, 'admins', idToUpdate), {
           last_logout: new Date().toISOString()
         });
       } catch (e) { console.error(e); }
