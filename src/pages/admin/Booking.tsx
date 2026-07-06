@@ -12,8 +12,10 @@ import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquar
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
+import { useAdmin } from '@/contexts/AdminContext';
 
 export default function BookingPage() {
+  const { adminData } = useAdmin();
   const [bookings, setBookings] = useState<(Booking & { mhs?: Mahasiswa })[]>([]);
   const [mahasiswaMap, setMahasiswaMap] = useState<Record<string, Mahasiswa>>({});
   const [loading, setLoading] = useState(true);

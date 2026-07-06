@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon, UserCircle } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAdmin } from '@/contexts/AdminContext';
 import { auth } from '@/lib/firebase';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
@@ -14,6 +17,7 @@ export default function AdminLayout() {
     return localStorage.getItem('admin_theme') === 'dark';
   });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { adminData, loadingAdmin } = useAdmin();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,12 +49,19 @@ export default function AdminLayout() {
   }, [darkMode]);
 
   const handleLogout = async () => {
+    if (auth.currentUser) {
+      try {
+        await updateDoc(doc(db, 'admins', auth.currentUser.uid), {
+          last_logout: new Date().toISOString()
+        });
+      } catch (e) { console.error(e); }
+    }
     await signOut(auth);
     navigate('/admin/login');
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#121212] flex items-center justify-center font-['Roboto',_sans-serif] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">Memuat...</div>;
+    return <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#121212] flex items-center justify-center  text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">Memuat...</div>;
   }
 
   const menu = [
@@ -61,8 +72,13 @@ export default function AdminLayout() {
     { name: 'Scanner', path: '/admin/scanner', icon: ScanLine },
   ];
 
+  if (adminData?.role === 'super_admin') {
+    menu.push({ name: 'Admins', path: '/admin/users', icon: Users });
+  }
+  menu.push({ name: 'Profil', path: '/admin/profil', icon: UserCircle });
+
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-[#F8F9FA] dark:bg-[#121212] flex flex-col md:flex-row font-['Roboto',_sans-serif] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">
+    <div className="h-[100dvh] w-full overflow-hidden bg-[#F8F9FA] dark:bg-[#121212] flex flex-col md:flex-row  text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">
       {/* Sidebar Modern SaaS style - hidden on mobile, visible on desktop */}
       <aside className="w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col hidden md:flex h-full sticky top-0 transition-colors duration-200">
         <div className="p-6 flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800/60">
@@ -109,8 +125,8 @@ export default function AdminLayout() {
               AD
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">Admin Akademik</p>
-              <p className="text-[10px] text-gray-500 truncate">Super Administrator</p>
+              <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">{adminData?.nama || "Admin Akademik"}</p>
+              <p className="text-[10px] text-gray-500 truncate">{adminData?.role === "super_admin" ? "Super Administrator" : `Admin ${adminData?.fakultas || ""}`}</p>
             </div>
           </div>
           <button 

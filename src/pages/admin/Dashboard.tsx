@@ -6,8 +6,10 @@ import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { isBookingExpired } from '@/lib/utils';
+import { useAdmin } from '@/contexts/AdminContext';
 
 export default function Dashboard() {
+  const { adminData } = useAdmin();
   const [mahasiswaList, setMahasiswaList] = useState<any[]>([]);
   const [bookingList, setBookingList] = useState<any[]>([]);
   
@@ -82,7 +84,13 @@ export default function Dashboard() {
     let belumTersedia = 0;
     let sudahAmbil = 0;
 
-    mahasiswaList.forEach(m => {
+    let filteredMahasiswa = mahasiswaList;
+    if (adminData?.role === 'admin' && adminData.fakultas) {
+      const keywords = adminData.fakultas.split(',').map(k => k.trim().toLowerCase());
+      filteredMahasiswa = mahasiswaList.filter(m => keywords.some(k => (m.prodi || '').toLowerCase().includes(k)));
+    }
+
+    filteredMahasiswa.forEach(m => {
       const status = m.status_ktm;
       const bStatus = bookingMap[m.id];
       
@@ -133,7 +141,7 @@ export default function Dashboard() {
 
     // 4. Update Stats State
     setStats({
-      totalMahasiswa: mahasiswaList.length,
+      totalMahasiswa: filteredMahasiswa.length,
       ktmTersedia: tersedia,
       ktmBelumTersedia: belumTersedia,
       ktmSudahAmbil: sudahAmbil,

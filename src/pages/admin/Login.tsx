@@ -32,7 +32,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex bg-gray-50 dark:bg-[#0A0A0A] transition-colors duration-300 font-['Roboto',_sans-serif]">
+    <div className="min-h-[100dvh] flex bg-gray-50 dark:bg-[#0A0A0A] transition-colors duration-300 ">
       {/* Left Panel - Branding (Hidden on mobile) */}
       <div className="hidden lg:flex lg:w-[45%] relative bg-[#005BAC] dark:bg-blue-900 overflow-hidden items-center justify-center">
         <div className="absolute inset-0">
@@ -45,11 +45,11 @@ export default function LoginPage() {
         </div>
         
         <div className="relative z-10 p-12 text-white max-w-xl">
-          <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 border border-white/20 shadow-xl">
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-8 shadow-xl">
             <img 
               src="/logo-uii.png" 
               alt="Logo UII" 
-              className="w-10 h-10 object-contain drop-shadow-md brightness-0 invert"
+              className="w-10 h-10 object-contain drop-shadow-md "
               referrerPolicy="no-referrer"
             />
           </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
               <img 
                 src="/logo-uii.png" 
                 alt="Logo UII" 
-                className="w-10 h-10 object-contain"
+                className="w-10 h-10 object-contain "
                 referrerPolicy="no-referrer"
               />
             </div>
