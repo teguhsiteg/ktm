@@ -68,7 +68,7 @@ export default function AdminLayout() {
         <div className="p-6 flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800/60">
           <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-7 h-7 object-contain"
               referrerPolicy="no-referrer"
@@ -128,7 +128,7 @@ export default function AdminLayout() {
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-5 h-5 object-contain"
               referrerPolicy="no-referrer"

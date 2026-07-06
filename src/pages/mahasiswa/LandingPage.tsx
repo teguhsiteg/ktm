@@ -261,16 +261,15 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
-              className="w-10 h-10 object-contain"
-              referrerPolicy="no-referrer"
+              className="w-10 h-10 sm:w-11 sm:h-11 object-contain"
             />
             <div>
-              <span className="font-bold text-gray-900 dark:text-white block tracking-tight text-sm sm:text-base">
+              <span className="font-bold text-gray-900 dark:text-white block tracking-tight text-sm sm:text-base leading-tight">
                 Universitas Islam Indonesia
               </span>
-              <span className="text-[10px] text-[#005BAC] dark:text-[#8AB4F8] font-semibold tracking-wider block uppercase">
+              <span className="text-[10px] text-[#005BAC] dark:text-[#8AB4F8] font-bold tracking-wider block uppercase mt-0.5">
                 Sistem Reservasi KTM
               </span>
             </div>
@@ -279,20 +278,20 @@ export default function LandingPage() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col lg:grid lg:grid-cols-12 gap-8 items-start">
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-12 items-start flex-grow">
         
         {/* Left Side: Professional Information and Guides */}
-        <section className="lg:col-span-7 space-y-6 w-full">
+        <section className="lg:col-span-7 space-y-6 lg:space-y-8 w-full">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 bg-[#005BAC]/10 text-[#005BAC] dark:text-[#8AB4F8] dark:bg-[#005BAC]/20 px-3 py-1 rounded-full text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 bg-[#005BAC]/10 text-[#005BAC] dark:text-[#8AB4F8] dark:bg-[#005BAC]/20 px-3 py-1.5 rounded-full text-xs font-semibold">
               <Info className="w-3.5 h-3.5" />
               Layanan Mandiri Pengambilan Kartu Tanda Mahasiswa
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-[1.15]">
               Reservasi Pengambilan <span className="text-[#005BAC]">KTM UII</span> Baru Lebih Mudah
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base leading-relaxed max-w-xl">
-              Hindari antrean panjang dan pastikan Kartu Tanda Mahasiswa (KTM) fisik Anda telah siap sebelum datang ke Kantor Pelayanan Akademik. Silakan cari data diri Anda dan jadwalkan pengambilan.
+              Hindari antrean panjang dan pastikan Kartu Tanda Mahasiswa (KTM) fisik Anda telah siap sebelum datang ke Kantor Pelayanan Akademik.
             </p>
           </div>
 
@@ -586,7 +585,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="flex items-center space-x-3 justify-center md:justify-start">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-8 h-8 object-contain"
               referrerPolicy="no-referrer"

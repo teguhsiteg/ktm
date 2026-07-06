@@ -137,7 +137,7 @@ export default function TicketPage() {
           {/* UII Badge */}
           <div className="w-16 h-16 bg-white border dark:border-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-md p-2">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-full h-full object-contain animate-pulse"
               referrerPolicy="no-referrer"
@@ -172,7 +172,7 @@ export default function TicketPage() {
           {/* UII Badge */}
           <div className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-md p-2">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-full h-full object-contain"
               referrerPolicy="no-referrer"

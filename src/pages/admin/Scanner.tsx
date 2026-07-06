@@ -1023,7 +1023,7 @@ export default function ScannerPage() {
                       <div className="bg-slate-50 dark:bg-zinc-800/40 px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                         <span className="text-[9px] font-extrabold tracking-widest text-gray-400 uppercase font-mono">UII KTM BOARDING PASS</span>
                         <img 
-                          src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+                          src="/logo-uii.png" 
                           alt="UII" 
                           className="w-5 h-5 object-contain opacity-80"
                           referrerPolicy="no-referrer"

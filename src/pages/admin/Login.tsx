@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="relative z-10 p-12 text-white max-w-xl">
           <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 border border-white/20 shadow-xl">
             <img 
-              src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+              src="/logo-uii.png" 
               alt="Logo UII" 
               className="w-10 h-10 object-contain drop-shadow-md brightness-0 invert"
               referrerPolicy="no-referrer"
@@ -74,7 +74,7 @@ export default function LoginPage() {
           <div className="lg:hidden mb-10 flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-white dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-5 shadow-sm border border-gray-200 dark:border-gray-800">
               <img 
-                src="https://www.uii.ac.id/wp-content/uploads/2017/04/Logo-UII-Asli.png" 
+                src="/logo-uii.png" 
                 alt="Logo UII" 
                 className="w-10 h-10 object-contain"
                 referrerPolicy="no-referrer"

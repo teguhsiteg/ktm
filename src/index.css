@@ -9,7 +9,8 @@
 
 @layer base {
   body {
-    @apply font-sans bg-[#F8F9FA] dark:bg-[#121212] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200;
+    @apply font-sans bg-[#F8F9FA] dark:bg-[#121212] text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200 overflow-y-scroll overflow-x-hidden;
+    overscroll-behavior-y: none;
   }
 }
 
