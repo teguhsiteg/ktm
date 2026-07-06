@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon, UserCircle, MapPin, Settings, Building2 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -69,12 +69,14 @@ export default function AdminLayout() {
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Mahasiswa', path: '/admin/mahasiswa', icon: Users },
     { name: 'Jadwal', path: '/admin/jadwal', icon: CalendarDays },
+    { name: 'Fakultas & Prodi', path: '/admin/lokasi', icon: Building2 },
     { name: 'Booking', path: '/admin/booking', icon: Ticket },
     { name: 'Scanner', path: '/admin/scanner', icon: ScanLine },
   ];
 
   if (adminData?.role === 'super_admin') {
     menu.push({ name: 'Admins', path: '/admin/users', icon: Users });
+    menu.push({ name: 'Pengaturan', path: '/admin/pengaturan', icon: Settings });
   }
   menu.push({ name: 'Profil', path: '/admin/profil', icon: UserCircle });
 

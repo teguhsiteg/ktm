@@ -11,6 +11,8 @@ import ScannerPage from './pages/admin/Scanner';
 import LoginPage from './pages/admin/Login';
 import UsersPage from './pages/admin/Users';
 import ProfilePage from './pages/admin/Profile';
+import LokasiPage from './pages/admin/Lokasi';
+import PengaturanPage from './pages/admin/Pengaturan';
 import { Toaster } from 'sonner';
 import PublicScannerPage from './pages/PublicScanner';
 import { AdminProvider } from './contexts/AdminContext';
@@ -37,10 +39,12 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="mahasiswa" element={<MahasiswaPage />} />
           <Route path="jadwal" element={<JadwalPage />} />
+          <Route path="lokasi" element={<LokasiPage />} />
           <Route path="booking" element={<BookingPage />} />
           <Route path="scanner" element={<ScannerPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="profil" element={<ProfilePage />} />
+          <Route path="pengaturan" element={<PengaturanPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -50,3 +50,12 @@ export interface Admin {
   email: string;
   role: string;
 }
+
+export interface ProdiMapping {
+  id?: string;
+  prodi: string;
+  fakultas: string;
+  lokasi: string;
+  created_at?: any;
+  updated_at?: any;
+}

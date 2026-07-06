@@ -3,14 +3,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper to check if user is logged in as an authenticated Administrator
+    // Helper to check if user is logged in as an authenticated Administrator in the admins collection
     function isAdmin() {
-      return request.auth != null;
+      return request.auth != null && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+      );
     }
 
     // --- ADMINS COLLECTION ---
     match /admins/{userId} {
-      // Admins can read and write to the admins collection
+      // Allow user to get their own admin record or query their own record by email during login
+      allow get: if request.auth != null && (
+        request.auth.uid == userId || 
+        request.auth.token.email == userId
+      );
+      allow list: if request.auth != null && (
+        resource.data.email == request.auth.token.email
+      );
+      // Bootstrapping: Allow the designated super_admin email to create their own admin document
+      allow create: if request.auth != null && (
+        request.auth.token.email == '236102601@uii.ac.id' && (userId == request.auth.uid || userId == request.auth.token.email)
+      );
+      // Existing verified admins have full read/write access
       allow read, write: if isAdmin();
     }
 
@@ -46,10 +61,10 @@ service cloud.firestore {
       allow create: if request.resource.data.status == 'Belum Diambil' 
                     && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'jadwal_id', 'tanggal', 'jam', 'wa', 'status', 'qr_token', 'created_at', 'updated_at']);
                     
-      // Public can change ticket status to "Hangus" to flag expired bookings OR reschedule their schedule
+      // Public can change ticket status to "Hangus" to flag expired bookings OR reschedule their schedule (with WA update)
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at'])
                         && request.resource.data.status == 'Hangus')
-                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['jadwal_id', 'tanggal', 'jam', 'updated_at'])
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['jadwal_id', 'tanggal', 'jam', 'wa', 'updated_at'])
                         && resource.data.status == 'Belum Diambil');
     }
     
@@ -73,6 +88,22 @@ service cloud.firestore {
       // Public scanner can write a new scan entry to the queue for admin real-time terminal display
       allow create: if request.resource.data.status == 'pending'
                     && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'nim', 'nama', 'prodi', 'scanned_at', 'status', 'is_early']);
+    }
+
+    // --- PRODI_MAPPING COLLECTION ---
+    match /prodi_mapping/{mappingId} {
+      // Admins can write
+      allow write: if isAdmin();
+      // Public can read to verify location
+      allow read: if true;
+    }
+
+    // --- SETTINGS COLLECTION ---
+    match /settings/{settingsId} {
+      // Public can read settings
+      allow read: if true;
+      // Admins can write settings
+      allow write: if isAdmin();
     }
   }
 }

@@ -4,10 +4,11 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Booking, Mahasiswa } from '@/types';
+import { getFacultyInfo } from '@/utils/prodiMapping';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
-import { Download, Image as ImageIcon, Printer, CheckCircle2, XCircle } from 'lucide-react';
+import { Download, Image as ImageIcon, Printer, CheckCircle2, XCircle, MapPin } from 'lucide-react';
 import { toPng, toCanvas } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
@@ -22,6 +23,34 @@ export default function TicketPage() {
   const [downloadingImage, setDownloadingImage] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
+  const [customMappings, setCustomMappings] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMappings = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'prodi_mapping'));
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCustomMappings(data);
+      } catch (e) {
+        console.error("Gagal mengambil prodi_mapping:", e);
+      }
+    };
+    fetchMappings();
+  }, []);
+
+  const getFacultyInfoWithCustom = (prodiName: string) => {
+    const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
+    const matched = customMappings.find(
+      m => normalize(m.prodi) === normalize(prodiName)
+    );
+    if (matched) {
+      return {
+        fakultas: matched.fakultas,
+        lokasi: matched.lokasi
+      };
+    }
+    return getFacultyInfo(prodiName);
+  };
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -285,34 +314,56 @@ export default function TicketPage() {
            <p className={`font-mono text-lg font-bold tracking-widest mb-8 ${isExpired ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{booking.booking_id}</p>
 
            {/* Details Grid */}
-           <div className="w-full grid grid-cols-2 gap-y-6 gap-x-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Nama</p>
-                <p className={`font-semibold mt-0.5 leading-tight ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.nama}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">NIM</p>
-                <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.nim}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Program Studi</p>
-                <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.prodi}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Tanggal</p>
-                <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>
-                  {format(parseISO(booking.tanggal), 'dd MMM yyyy', { locale: localeID })}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Jam</p>
-                <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{booking.jam}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">WhatsApp</p>
-                <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{booking.wa}</p>
-              </div>
-           </div>
+           {(() => {
+              const facInfo = getFacultyInfoWithCustom(mahasiswa.prodi);
+              return (
+                <div className="w-full space-y-5 text-left">
+                  <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                     <div>
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">Nama</p>
+                       <p className={`font-bold mt-0.5 leading-tight ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.nama}</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">NIM</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.nim}</p>
+                     </div>
+                     <div className="col-span-2">
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">Fakultas</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{facInfo.fakultas}</p>
+                     </div>
+                     <div className="col-span-2">
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">Program Studi</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{mahasiswa.prodi}</p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">Tanggal</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>
+                         {format(parseISO(booking.tanggal), 'dd MMM yyyy', { locale: localeID })}
+                       </p>
+                     </div>
+                     <div>
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">Jam</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{booking.jam}</p>
+                     </div>
+                     <div className="col-span-2">
+                       <p className="text-xs text-gray-500 uppercase tracking-wider">WhatsApp</p>
+                       <p className={`font-semibold mt-0.5 ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>{booking.wa}</p>
+                     </div>
+                  </div>
+
+                  {/* Tempat Pengambilan Ticket Banner */}
+                  <div className="pt-4 border-t border-dashed border-gray-200 print:border-gray-800">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#005BAC] print:text-black shrink-0" />
+                      <span>Lokasi Pengambilan KTM</span>
+                    </p>
+                    <p className={`font-bold text-xs leading-relaxed ${isExpired ? 'text-gray-500' : 'text-gray-900'}`}>
+                      {facInfo.lokasi}
+                    </p>
+                  </div>
+                </div>
+              );
+           })()}
 
            {/* Rebooking options for expired ticket */}
            {isExpired && (

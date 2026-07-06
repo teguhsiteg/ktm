@@ -11,6 +11,7 @@ import { Download, Upload, Plus, FileSpreadsheet, Search, X, ChevronUp, ChevronD
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
 import { useAdmin } from '@/contexts/AdminContext';
+import { getFacultyInfo, PRODI_TO_FACULTY_MAP } from '@/utils/prodiMapping';
 
 export default function MahasiswaPage() {
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa[]>([]);
@@ -20,11 +21,13 @@ export default function MahasiswaPage() {
   const [newMhs, setNewMhs] = useState({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [customMappings, setCustomMappings] = useState<any[]>([]);
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [filterProdi, setFilterProdi] = useState('Semua');
+  const [filterFakultas, setFilterFakultas] = useState('Semua');
 
   // Pagination & Sorting
   const [itemsPerPage, setItemsPerPage] = useState<'10' | '20' | '30' | 'Semua'>('10');
@@ -35,6 +38,28 @@ export default function MahasiswaPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [editingMhs, setEditingMhs] = useState<Mahasiswa | null>(null);
+
+  // Dynamic merging of study programs
+  const allProdis = useMemo(() => {
+    const fromDB = customMappings.map(m => m.prodi).filter(Boolean);
+    const fromStatic = Object.keys(PRODI_TO_FACULTY_MAP);
+    return Array.from(new Set([...fromDB, ...fromStatic])).sort((a, b) => a.localeCompare(b));
+  }, [customMappings]);
+
+  // Dynamic faculty and location resolver
+  const getFacultyInfoWithCustom = (prodiName: string) => {
+    const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
+    const matched = customMappings.find(
+      m => normalize(m.prodi) === normalize(prodiName)
+    );
+    if (matched) {
+      return {
+        fakultas: matched.fakultas,
+        lokasi: matched.lokasi
+      };
+    }
+    return getFacultyInfo(prodiName);
+  };
 
   const getCombinedStatus = (mhs: Mahasiswa, bookingsList: Booking[]) => {
     if (mhs.status_ktm === 'Belum tersedia') {
@@ -64,11 +89,12 @@ export default function MahasiswaPage() {
   useEffect(() => {
     let mhsLoaded = false;
     let bLoaded = false;
+    let mappingLoaded = false;
 
     const unsubMhs = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
       setMahasiswa(snap.docs.map(d => ({ id: d.id, ...d.data() } as Mahasiswa)));
       mhsLoaded = true;
-      if (bLoaded) setLoading(false);
+      if (bLoaded && mappingLoaded) setLoading(false);
     }, (err) => {
       console.error(err);
       setLoading(false);
@@ -77,7 +103,16 @@ export default function MahasiswaPage() {
     const unsubBooking = onSnapshot(collection(db, 'booking'), (snap) => {
       setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() } as Booking)));
       bLoaded = true;
-      if (mhsLoaded) setLoading(false);
+      if (mhsLoaded && mappingLoaded) setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
+    });
+
+    const unsubMapping = onSnapshot(collection(db, 'prodi_mapping'), (snap) => {
+      setCustomMappings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      mappingLoaded = true;
+      if (mhsLoaded && bLoaded) setLoading(false);
     }, (err) => {
       console.error(err);
       setLoading(false);
@@ -86,6 +121,7 @@ export default function MahasiswaPage() {
     return () => {
       unsubMhs();
       unsubBooking();
+      unsubMapping();
     };
   }, []);
 
@@ -246,8 +282,20 @@ export default function MahasiswaPage() {
     }
   };
 
+  // Extract unique faculties for the filter dropdown
+  const uniqueFakultas = useMemo(() => {
+    const list = mahasiswa.map(m => getFacultyInfoWithCustom(m.prodi).fakultas).filter(Boolean);
+    return ['Semua', ...Array.from(new Set(list))];
+  }, [mahasiswa, customMappings]);
+
   // Extract unique study programs for the filter dropdown
-  const uniqueProdi = ['Semua', ...Array.from(new Set(mahasiswa.map(m => m.prodi).filter(Boolean)))];
+  const uniqueProdi = useMemo(() => {
+    let list = mahasiswa;
+    if (filterFakultas !== 'Semua') {
+      list = mahasiswa.filter(m => getFacultyInfoWithCustom(m.prodi).fakultas === filterFakultas);
+    }
+    return ['Semua', ...Array.from(new Set(list.map(m => m.prodi).filter(Boolean)))];
+  }, [mahasiswa, filterFakultas, customMappings]);
 
   const processedMahasiswa = useMemo(() => {
     let result = mahasiswa.filter(m => {
@@ -258,9 +306,10 @@ export default function MahasiswaPage() {
       const combStatus = getCombinedStatus(m, bookings);
       const matchesStatus = filterStatus === 'Semua' || combStatus === filterStatus;
       
+      const matchesFakultas = filterFakultas === 'Semua' || getFacultyInfoWithCustom(m.prodi).fakultas === filterFakultas;
       const matchesProdi = filterProdi === 'Semua' || m.prodi === filterProdi;
       
-      return matchesSearch && matchesStatus && matchesProdi;
+      return matchesSearch && matchesStatus && matchesFakultas && matchesProdi;
     });
 
     if (sortConfig) {
@@ -274,7 +323,7 @@ export default function MahasiswaPage() {
     }
 
     return result;
-  }, [mahasiswa, bookings, searchQuery, filterStatus, filterProdi, sortConfig]);
+  }, [mahasiswa, bookings, searchQuery, filterStatus, filterFakultas, filterProdi, sortConfig]);
 
   const totalPages = itemsPerPage === 'Semua' ? 1 : Math.ceil(processedMahasiswa.length / parseInt(itemsPerPage));
   const currentData = itemsPerPage === 'Semua' 
@@ -348,29 +397,70 @@ export default function MahasiswaPage() {
             <CardTitle className="text-lg">Tambah Mahasiswa Manual</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <form onSubmit={handleAdd} className="space-y-4 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">NIM</label>
-                  <Input value={newMhs.nim} onChange={e => setNewMhs({...newMhs, nim: e.target.value})} required className="dark:bg-[#2A2A2A] dark:border-gray-800" />
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">NIM Mahasiswa</label>
+                  <Input 
+                    value={newMhs.nim} 
+                    onChange={e => setNewMhs({...newMhs, nim: e.target.value})} 
+                    required 
+                    placeholder="Contoh: 236102601"
+                    className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
+                  />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Nama</label>
-                  <Input value={newMhs.nama} onChange={e => setNewMhs({...newMhs, nama: e.target.value})} required className="dark:bg-[#2A2A2A] dark:border-gray-800" />
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">Nama Lengkap</label>
+                  <Input 
+                    value={newMhs.nama} 
+                    onChange={e => setNewMhs({...newMhs, nama: e.target.value})} 
+                    required 
+                    placeholder="Masukkan nama mahasiswa..."
+                    className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
+                  />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Prodi</label>
-                  <Input value={newMhs.prodi} onChange={e => setNewMhs({...newMhs, prodi: e.target.value})} required className="dark:bg-[#2A2A2A] dark:border-gray-800" />
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">Program Studi</label>
+                  <select
+                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
+                    value={allProdis.includes(newMhs.prodi) ? newMhs.prodi : (newMhs.prodi ? 'custom' : '')}
+                    onChange={e => {
+                      if (e.target.value === 'custom') {
+                        setNewMhs({ ...newMhs, prodi: '' });
+                      } else {
+                        setNewMhs({ ...newMhs, prodi: e.target.value });
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">-- Pilih Program Studi --</option>
+                    {allProdis.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                    <option value="custom">✍️ Tulis Kustom / Manual...</option>
+                  </select>
                 </div>
+
                 <div>
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">TTL / Tanggal Lahir</label>
-                  <Input placeholder="Contoh: 5/02/95" value={newMhs.ttl} onChange={e => setNewMhs({...newMhs, ttl: e.target.value})} required className="dark:bg-[#2A2A2A] dark:border-gray-800" />
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">TTL / Tanggal Lahir</label>
+                  <Input 
+                    placeholder="Contoh: 1999-05-12 atau 12/05/99" 
+                    value={newMhs.ttl} 
+                    onChange={e => setNewMhs({...newMhs, ttl: e.target.value})} 
+                    required 
+                    className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
+                  />
                 </div>
+
                 <div>
-                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Status KTM</label>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">Status KTM</label>
                   <select 
-                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
-                    value={newMhs.status_ktm} onChange={e => setNewMhs({...newMhs, status_ktm: e.target.value})}
+                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
+                    value={newMhs.status_ktm} 
+                    onChange={e => setNewMhs({...newMhs, status_ktm: e.target.value})}
                   >
                     <option value="Tersedia" className="dark:bg-[#1E1E1E]">Tersedia</option>
                     <option value="Belum tersedia" className="dark:bg-[#1E1E1E]">Belum tersedia</option>
@@ -378,21 +468,34 @@ export default function MahasiswaPage() {
                   </select>
                 </div>
               </div>
+
+              {(!allProdis.includes(newMhs.prodi) || newMhs.prodi === '') && (
+                <div className="animate-in slide-in-from-top-2 duration-200">
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">Nama Program Studi Manual</label>
+                  <Input 
+                    placeholder="Tulis nama program studi lengkap (contoh: Informatika)" 
+                    value={newMhs.prodi} 
+                    onChange={e => setNewMhs({...newMhs, prodi: e.target.value})} 
+                    required 
+                    className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
+                  />
+                </div>
+              )}
               
               {newMhs.status_ktm === 'Belum tersedia' && (
                 <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                  <label className="text-xs text-gray-500 dark:text-gray-400 block">Catatan untuk KTM Belum Tersedia</label>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">Catatan untuk KTM Belum Tersedia</label>
                   <Input 
                     placeholder="Contoh: Sedang dalam proses cetak / Ada kendala foto..." 
                     value={newMhs.catatan_ktm} 
                     onChange={e => setNewMhs({...newMhs, catatan_ktm: e.target.value})} 
-                    className="w-full dark:bg-[#2A2A2A] dark:border-gray-800" 
+                    className="w-full dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
                   />
                 </div>
               )}
 
-              <div className="flex justify-end">
-                <Button type="submit">Simpan</Button>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" className="h-10 text-xs font-bold px-5 bg-[#005BAC] hover:bg-[#004B8C] text-white rounded-xl">Simpan Mahasiswa</Button>
               </div>
             </form>
           </CardContent>
@@ -400,14 +503,14 @@ export default function MahasiswaPage() {
       )}
 
       {/* Global Search and Filter Section */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-white dark:bg-[#1E1E1E] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-        <div className="md:col-span-5 relative">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white dark:bg-[#1E1E1E] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="md:col-span-3 relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400 dark:text-gray-500" />
           <Input 
-            placeholder="Cari berdasarkan nama mahasiswa atau NIM..." 
+            placeholder="Cari nama / NIM..." 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 w-full dark:bg-[#2A2A2A] dark:border-gray-800 dark:text-gray-100"
+            className="pl-10 h-10 w-full dark:bg-[#2A2A2A] dark:border-gray-800 dark:text-gray-100 text-xs"
           />
           {searchQuery && (
             <button 
@@ -420,13 +523,13 @@ export default function MahasiswaPage() {
           )}
         </div>
 
-        <div className="md:col-span-3">
+        <div className="md:col-span-2">
           <select 
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
           >
-            <option value="Semua">Semua Status KTM & Booking</option>
+            <option value="Semua">Semua Status</option>
             <option value="Tersedia">Tersedia (Belum Booking)</option>
             <option value="Sudah Booking">Sudah Booking</option>
             <option value="Sudah diambil">Sudah Diambil</option>
@@ -435,26 +538,42 @@ export default function MahasiswaPage() {
           </select>
         </div>
 
-        <div className="md:col-span-3 flex gap-2">
+        <div className="md:col-span-3">
+          <select 
+            value={filterFakultas}
+            onChange={e => {
+              setFilterFakultas(e.target.value);
+              setFilterProdi('Semua'); // Reset prodi when faculty changes
+            }}
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
+          >
+            {uniqueFakultas.map(fak => (
+              <option key={fak} value={fak}>{fak === 'Semua' ? 'Semua Fakultas' : fak}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:col-span-3 flex gap-1.5">
           <select 
             value={filterProdi}
             onChange={e => setFilterProdi(e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent transition-colors duration-150"
           >
             {uniqueProdi.map(prodi => (
-              <option key={prodi} value={prodi}>{prodi === 'Semua' ? 'Semua Program Studi' : prodi}</option>
+              <option key={prodi} value={prodi}>{prodi === 'Semua' ? 'Semua Prodi' : prodi}</option>
             ))}
           </select>
 
-          {(searchQuery !== '' || filterStatus !== 'Semua' || filterProdi !== 'Semua') && (
+          {(searchQuery !== '' || filterStatus !== 'Semua' || filterFakultas !== 'Semua' || filterProdi !== 'Semua') && (
             <Button 
               variant="outline" 
               onClick={() => {
                 setSearchQuery('');
                 setFilterStatus('Semua');
+                setFilterFakultas('Semua');
                 setFilterProdi('Semua');
               }}
-              className="h-10 px-3 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-950 dark:hover:bg-red-950/30 whitespace-nowrap"
+              className="h-10 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-950 dark:hover:bg-red-950/30 whitespace-nowrap"
             >
               Reset
             </Button>
@@ -465,11 +584,11 @@ export default function MahasiswaPage() {
           <select 
             value={itemsPerPage}
             onChange={e => setItemsPerPage(e.target.value as any)}
-            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-2 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
+            className="flex h-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-2 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
           >
-            <option value="10">10 / hal</option>
-            <option value="20">20 / hal</option>
-            <option value="30">30 / hal</option>
+            <option value="10">10/hal</option>
+            <option value="20">20/hal</option>
+            <option value="30">30/hal</option>
             <option value="Semua">Semua</option>
           </select>
         </div>
@@ -743,13 +862,24 @@ export default function MahasiswaPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Program Studi</label>
-                  <Input 
-                    value={editingMhs.prodi} 
-                    onChange={e => setEditingMhs({...editingMhs, prodi: e.target.value})} 
-                    required 
-                    className="dark:bg-[#2A2A2A] dark:border-gray-800"
-                    id="edit-prodi"
-                  />
+                  <select
+                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-3 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC]"
+                    value={allProdis.includes(editingMhs.prodi) ? editingMhs.prodi : (editingMhs.prodi ? 'custom' : '')}
+                    onChange={e => {
+                      if (e.target.value === 'custom') {
+                        setEditingMhs({ ...editingMhs, prodi: '' });
+                      } else {
+                        setEditingMhs({ ...editingMhs, prodi: e.target.value });
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">-- Pilih Program Studi --</option>
+                    {allProdis.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                    <option value="custom">✍️ Tulis Kustom / Manual...</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400">TTL / Tanggal Lahir</label>
@@ -762,6 +892,20 @@ export default function MahasiswaPage() {
                   />
                 </div>
               </div>
+
+              {(!allProdis.includes(editingMhs.prodi) || editingMhs.prodi === '') && (
+                <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Nama Program Studi Manual</label>
+                  <Input 
+                    placeholder="Tulis nama program studi lengkap (contoh: Informatika)" 
+                    value={editingMhs.prodi} 
+                    onChange={e => setEditingMhs({...editingMhs, prodi: e.target.value})} 
+                    required 
+                    className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
+                    id="edit-prodi"
+                  />
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Status KTM</label>

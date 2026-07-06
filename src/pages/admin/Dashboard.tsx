@@ -7,6 +7,7 @@ import { id as localeID } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { isBookingExpired } from '@/lib/utils';
 import { useAdmin } from '@/contexts/AdminContext';
+import { getFacultyInfo } from '@/utils/prodiMapping';
 
 export default function Dashboard() {
   const { adminData } = useAdmin();
@@ -86,8 +87,19 @@ export default function Dashboard() {
 
     let filteredMahasiswa = mahasiswaList;
     if (adminData?.role === 'admin' && adminData.fakultas) {
+      const adminFac = adminData.fakultas.toLowerCase();
       const keywords = adminData.fakultas.split(',').map(k => k.trim().toLowerCase());
-      filteredMahasiswa = mahasiswaList.filter(m => keywords.some(k => (m.prodi || '').toLowerCase().includes(k)));
+      
+      filteredMahasiswa = mahasiswaList.filter(m => {
+        const studentFacInfo = getFacultyInfo(m.prodi);
+        const studentFac = (studentFacInfo?.fakultas || '').toLowerCase();
+        const prodiClean = (m.prodi || '').toLowerCase();
+        
+        return studentFac === adminFac || 
+               studentFac.includes(adminFac) || 
+               adminFac.includes(studentFac) ||
+               keywords.some(k => prodiClean.includes(k));
+      });
     }
 
     filteredMahasiswa.forEach(m => {

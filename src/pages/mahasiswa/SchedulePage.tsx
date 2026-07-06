@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Jadwal, Mahasiswa, Booking } from '@/types';
+import { getFacultyInfo } from '@/utils/prodiMapping';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { generateBookingId, isBookingExpired } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Clock, User, ArrowLeft, Check, CheckCircle2, AlertCircle, Info, ChevronRight, RefreshCw, Sparkles, Phone, ShieldCheck } from 'lucide-react';
+import { Calendar, Clock, User, ArrowLeft, Check, CheckCircle2, AlertCircle, Info, ChevronRight, RefreshCw, Sparkles, Phone, ShieldCheck, MapPin } from 'lucide-react';
 
 export default function SchedulePage() {
   const { id } = useParams(); // mahasiswa_id
   const navigate = useNavigate();
   const location = useLocation();
-  const wa = location.state?.wa || '';
+  const [waNumber, setWaNumber] = useState(location.state?.wa || '');
   const isReschedule = location.state?.reschedule || false;
   const oldBookingId = location.state?.oldBookingId || '';
   const oldJadwalId = location.state?.oldJadwalId || '';
@@ -28,15 +29,37 @@ export default function SchedulePage() {
   const [selectedJadwal, setSelectedJadwal] = useState<Jadwal | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [customMappings, setCustomMappings] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMappings = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'prodi_mapping'));
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCustomMappings(data);
+      } catch (e) {
+        console.error("Gagal mengambil prodi_mapping:", e);
+      }
+    };
+    fetchMappings();
+  }, []);
+
+  const getFacultyInfoWithCustom = (prodiName: string) => {
+    const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
+    const matched = customMappings.find(
+      m => normalize(m.prodi) === normalize(prodiName)
+    );
+    if (matched) {
+      return {
+        fakultas: matched.fakultas,
+        lokasi: matched.lokasi
+      };
+    }
+    return getFacultyInfo(prodiName);
+  };
 
   useEffect(() => {
     if (!id) {
-      navigate('/');
-      return;
-    }
-
-    if (!wa) {
-      toast.error('Harap masukkan nomor WhatsApp terlebih dahulu di halaman pencarian');
       navigate('/');
       return;
     }
@@ -50,6 +73,12 @@ export default function SchedulePage() {
         const bookingSnap = await getDocs(bookingQ);
         if (!bookingSnap.empty) {
           const mbs = bookingSnap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
+          
+          // Restore WA number from previous bookings if current state is empty
+          const existingWa = mbs.find(b => b.wa)?.wa;
+          if (existingWa && !waNumber) {
+            setWaNumber(existingWa);
+          }
           
           const activeBooking = mbs.find(b => b.status === 'Belum Diambil' && !isBookingExpired(b.tanggal, b.jam));
           const takenBooking = mbs.find(b => b.status === 'Sudah Diambil');
@@ -117,6 +146,17 @@ export default function SchedulePage() {
 
   const handleBooking = async () => {
     if (!selectedJadwal || !mahasiswa) return;
+    
+    const cleanWA = waNumber.trim().replace(/[^0-9]/g, '');
+    if (!cleanWA) {
+      toast.error('Harap masukkan nomor WhatsApp aktif Anda terlebih dahulu');
+      return;
+    }
+    if (cleanWA.length < 10 || cleanWA.length > 14) {
+      toast.error('Nomor WhatsApp harus berukuran antara 10 - 14 karakter angka');
+      return;
+    }
+
     setBookingLoading(true);
     
     try {
@@ -167,6 +207,7 @@ export default function SchedulePage() {
             jadwal_id: selectedJadwal.id,
             tanggal: selectedJadwal.tanggal,
             jam: `${selectedJadwal.jam_mulai}-${selectedJadwal.jam_selesai}`,
+            wa: cleanWA,
             updated_at: serverTimestamp()
           });
         } else {
@@ -178,7 +219,7 @@ export default function SchedulePage() {
             jadwal_id: selectedJadwal.id,
             tanggal: selectedJadwal.tanggal,
             jam: `${selectedJadwal.jam_mulai}-${selectedJadwal.jam_selesai}`,
-            wa: wa,
+            wa: cleanWA,
             status: 'Belum Diambil',
             qr_token: newBookingId, // For simplicity using booking ID as token
             created_at: serverTimestamp(),
@@ -265,34 +306,49 @@ export default function SchedulePage() {
         </div>
 
         {/* Student Profile Card */}
-        {mahasiswa && (
-          <div className="bg-white dark:bg-[#1E1E1E] rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm p-5 mb-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-[#005BAC] dark:text-blue-400 border border-blue-100/60 dark:border-blue-950">
-                <User className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-400 dark:text-gray-500 font-medium">Mahasiswa Pemohon</div>
-                <h3 className="font-bold text-gray-900 dark:text-gray-100 truncate mt-0.5">{mahasiswa.nama}</h3>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="font-mono">{mahasiswa.nim}</span>
-                  <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
-                  <span>{mahasiswa.prodi}</span>
+        {mahasiswa && (() => {
+          const facInfo = getFacultyInfoWithCustom(mahasiswa.prodi);
+          return (
+            <div className="bg-white dark:bg-[#1E1E1E] rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm p-5 mb-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-[#005BAC] dark:text-blue-400 border border-blue-100/60 dark:border-blue-950">
+                  <User className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-gray-400 dark:text-gray-500 font-medium">Mahasiswa Pemohon</div>
+                  <h3 className="font-bold text-gray-900 dark:text-gray-100 truncate mt-0.5">{mahasiswa.nama}</h3>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-mono">{mahasiswa.nim}</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+                    <span>{mahasiswa.prodi}</span>
+                  </div>
+                  <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    {facInfo.fakultas}
+                  </div>
                 </div>
               </div>
+
+              {/* Lokasi Pengambilan Map Pin Banner */}
+              <div className="flex items-start gap-2.5 p-3 bg-blue-50/50 dark:bg-[#005BAC]/5 border border-blue-100/30 dark:border-blue-950/20 rounded-xl text-left">
+                <MapPin className="w-4 h-4 text-[#005BAC] dark:text-[#8AB4F8] shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 block">Tempat Pengambilan KTM</span>
+                  <span className="text-slate-600 dark:text-slate-400 leading-relaxed mt-0.5 block">{facInfo.lokasi}</span>
+                </div>
+              </div>
+              
+              {/* Reschedule Warning Alert */}
+              {isReschedule && (
+                <div className="mt-4 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-950/80 rounded-xl flex gap-2.5 items-start">
+                  <RefreshCw className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-spin" style={{ animationDuration: '4s' }} />
+                  <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                    <span className="font-bold">Mode Mengubah Jadwal:</span> Jadwal lama Anda ({oldBookingCode}) akan dipindahkan ke slot yang Anda pilih di bawah ini secara otomatis setelah konfirmasi.
+                  </div>
+                </div>
+              )}
             </div>
-            
-            {/* Reschedule Warning Alert */}
-            {isReschedule && (
-              <div className="mt-4 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-950/80 rounded-xl flex gap-2.5 items-start">
-                <RefreshCw className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-spin" style={{ animationDuration: '4s' }} />
-                <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
-                  <span className="font-bold">Mode Mengubah Jadwal:</span> Jadwal lama Anda ({oldBookingCode}) akan dipindahkan ke slot yang Anda pilih di bawah ini secara otomatis setelah konfirmasi.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* Schedules list container */}
         <div className="space-y-6">
@@ -495,12 +551,21 @@ export default function SchedulePage() {
                   <span className="font-bold text-[#005BAC] dark:text-blue-400 text-right">{selectedJadwal.jam_mulai} - {selectedJadwal.jam_selesai} WIB</span>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400 dark:text-gray-500 font-medium">WHATSAPP</span>
-                  <span className="font-bold text-gray-900 dark:text-gray-100 text-right flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>{wa}</span>
-                  </span>
+                <div className="flex flex-col gap-1 text-left pt-1">
+                  <span className="text-gray-400 dark:text-gray-500 font-medium">NOMOR WHATSAPP (AKTIF)</span>
+                  <div className="relative mt-1">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                    <input
+                      type="text"
+                      placeholder="Masukkan nomor WhatsApp..."
+                      value={waNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setWaNumber(val);
+                      }}
+                      className="w-full text-xs font-bold pl-9 pr-3 h-10 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#005BAC]/30 outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 

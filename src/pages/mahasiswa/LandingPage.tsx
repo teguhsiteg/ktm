@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Mahasiswa } from '@/types';
+import { getFacultyInfo } from '@/utils/prodiMapping';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
@@ -107,7 +108,7 @@ function parseDateStringToDMY(str: string): { day: number; month: number; year: 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ nim: '', ttl: '', prodi: '', wa: '' });
+  const [formData, setFormData] = useState({ nim: '', ttl: '', fakultas: '', prodi: '', wa: '' });
   const [prodis, setProdis] = useState<string[]>([
     'Informatika',
     'Teknik Industri',
@@ -141,10 +142,108 @@ export default function LandingPage() {
   ]);
   const [result, setResult] = useState<Mahasiswa | null>(null);
   const [searchDone, setSearchDone] = useState(false);
+  const [customMappings, setCustomMappings] = useState<any[]>([]);
+
+  // Unique Fakultas derived dynamically from the database mappings
+  const uniqueFakultas = useMemo(() => {
+    const list = customMappings.map(m => m.fakultas as string).filter(Boolean);
+    if (list.length === 0) {
+      return [
+        'Fakultas Teknologi Industri (FTI)',
+        'Fakultas Teknik Sipil dan Perencanaan (FTSP)',
+        'Fakultas Matematika dan Ilmu Pengetahuan Alam (FMIPA)',
+        'Fakultas Kedokteran (FK)',
+        'Fakultas Hukum (FH)',
+        'Fakultas Bisnis dan Ekonomika (FBE)',
+        'Fakultas Psikologi',
+        'Fakultas Ilmu Agama Islam (FIAI)',
+        'Fakultas Ilmu Sosial Budaya',
+        'Universitas Islam Indonesia'
+      ];
+    }
+    return (Array.from(new Set(list)) as string[]).sort((a, b) => a.localeCompare(b));
+  }, [customMappings]);
+
+  // Filtered Program Studi based on the selected Fakultas
+  const filteredProdis = useMemo(() => {
+    if (!formData.fakultas) return [];
+    const list = customMappings
+      .filter(m => m.fakultas === formData.fakultas)
+      .map(m => m.prodi as string)
+      .filter(Boolean);
+    // If no dynamic mappings found in selected fakultas, fallback to any matching in standard list (for safety)
+    if (list.length === 0) {
+      return prodis;
+    }
+    return (Array.from(new Set(list)) as string[]).sort((a, b) => a.localeCompare(b));
+  }, [formData.fakultas, customMappings, prodis]);
+
+  useEffect(() => {
+    const fetchMappings = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'prodi_mapping'));
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCustomMappings(data);
+
+        // Dynamic merging of study programs from the database
+        const dbProdis = data.map((m: any) => m.prodi).filter(Boolean);
+        const defaultProdis = [
+          'Informatika',
+          'Teknik Industri',
+          'Teknik Kimia',
+          'Teknik Sipil',
+          'Arsitektur',
+          'Teknik Lingkungan',
+          'Statistika',
+          'Statistika (International Program)',
+          'Kimia',
+          'Kimia (International Program)',
+          'Farmasi',
+          'Farmasi (International Program)',
+          'Kedokteran',
+          'Hukum',
+          'Manajemen',
+          'Akuntansi',
+          'Ilmu Ekonomi',
+          'Ilmu Komunikasi',
+          'Hubungan Internasional',
+          'Psikologi',
+          'Pendidikan Agama Islam',
+          'Hukum Keluarga (Ahwal Syakhshiyah)',
+          'Ekonomi Islam',
+          'Pendidikan Bahasa Inggris',
+          'Pendidikan Kimia',
+          'D3 Analisis Kimia',
+          'D3 Akuntansi',
+          'D3 Manajemen',
+          'D3 Perbankan & Keuangan'
+        ];
+        const combined = Array.from(new Set([...dbProdis, ...defaultProdis])).sort((a, b) => a.localeCompare(b));
+        setProdis(combined);
+      } catch (e) {
+        console.error("Gagal mengambil prodi_mapping:", e);
+      }
+    };
+    fetchMappings();
+  }, []);
+
+  const getFacultyInfoWithCustom = (prodiName: string) => {
+    const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
+    const matched = customMappings.find(
+      m => normalize(m.prodi) === normalize(prodiName)
+    );
+    if (matched) {
+      return {
+        fakultas: matched.fakultas,
+        lokasi: matched.lokasi
+      };
+    }
+    return getFacultyInfo(prodiName);
+  };
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.nim || !formData.ttl || !formData.prodi || !formData.wa) {
+    if (!formData.nim || !formData.ttl || !formData.fakultas || !formData.prodi || !formData.wa) {
       toast.error('Harap lengkapi semua data');
       return;
     }
@@ -418,6 +517,25 @@ export default function LandingPage() {
                   </p>
                 </div>
 
+                {/* Fakultas Selector */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="fakultas" className="flex items-center gap-1 font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Fakultas <span className="text-red-500 font-bold">*</span>
+                  </Label>
+                  <select
+                    id="fakultas"
+                    value={formData.fakultas}
+                    onChange={e => setFormData({...formData, fakultas: e.target.value, prodi: ''})}
+                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors"
+                    required
+                  >
+                    <option value="" className="text-gray-400">-- Pilih Fakultas --</option>
+                    {uniqueFakultas.map(fak => (
+                      <option key={fak} value={fak}>{fak}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Prodi Selector */}
                 <div className="space-y-1.5">
                   <Label htmlFor="prodi" className="flex items-center gap-1 font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -427,17 +545,16 @@ export default function LandingPage() {
                     id="prodi"
                     value={formData.prodi}
                     onChange={e => setFormData({...formData, prodi: e.target.value})}
-                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors"
+                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors disabled:opacity-60"
                     required
+                    disabled={!formData.fakultas}
                   >
-                    <option value="" className="text-gray-400">-- Pilih Program Studi --</option>
-                    {prodis.length === 0 ? (
-                      <option value="" disabled>Memuat daftar program studi...</option>
-                    ) : (
-                      prodis.map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))
-                    )}
+                    <option value="" className="text-gray-400">
+                      {formData.fakultas ? '-- Pilih Program Studi --' : '-- Pilih Fakultas Terlebih Dahulu --'}
+                    </option>
+                    {filteredProdis.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -545,35 +662,58 @@ export default function LandingPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="border-[#005BAC]/20 dark:border-blue-900/30 rounded-2xl shadow-md overflow-hidden animate-in zoom-in-95 duration-200">
-                  <div className="bg-[#005BAC]/10 px-6 py-3.5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                    <span className="text-xs font-bold text-[#005BAC] dark:text-[#8AB4F8] uppercase tracking-wider">Verifikasi Berhasil</span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded-full">
-                      <CheckCircle className="w-3 h-3" /> KTM Siap Diambil
-                    </span>
-                  </div>
-                  <CardContent className="p-6 space-y-4">
-                    <div className="space-y-3.5 text-sm">
-                      <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
-                        <span className="text-gray-500 text-xs">Nama Lengkap</span>
-                        <span className="font-bold text-gray-900 dark:text-white text-right">{result.nama}</span>
+                (() => {
+                  const facInfo = getFacultyInfoWithCustom(result.prodi);
+                  return (
+                    <Card className="border-[#005BAC]/20 dark:border-blue-900/30 rounded-2xl shadow-md overflow-hidden animate-in zoom-in-95 duration-200">
+                      <div className="bg-[#005BAC]/10 px-6 py-3.5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                        <span className="text-xs font-bold text-[#005BAC] dark:text-[#8AB4F8] uppercase tracking-wider">Verifikasi Berhasil</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                          <CheckCircle className="w-3 h-3" /> KTM Siap Diambil
+                        </span>
                       </div>
-                      <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
-                        <span className="text-gray-500 text-xs">NIM</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{result.nim}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
-                        <span className="text-gray-500 text-xs">Program Studi</span>
-                        <span className="font-semibold text-gray-900 dark:text-white text-right">{result.prodi}</span>
-                      </div>
-                    </div>
+                      <CardContent className="p-6 space-y-4">
+                        <div className="space-y-3.5 text-sm">
+                          <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
+                            <span className="text-gray-500 text-xs">Nama Lengkap</span>
+                            <span className="font-bold text-gray-900 dark:text-white text-right">{result.nama}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
+                            <span className="text-gray-500 text-xs">NIM</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">{result.nim}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
+                            <span className="text-gray-500 text-xs">Fakultas</span>
+                            <span className="font-semibold text-gray-900 dark:text-white text-right">{facInfo.fakultas}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-gray-50 dark:border-gray-800">
+                            <span className="text-gray-500 text-xs">Program Studi</span>
+                            <span className="font-semibold text-gray-900 dark:text-white text-right">{result.prodi}</span>
+                          </div>
+                        </div>
 
-                    <Button onClick={proceedToSchedule} className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold text-sm rounded-xl py-2.5 h-11 flex items-center justify-center gap-2">
-                      <span>Lanjut Pilih Sesi Jadwal</span>
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
+                        {/* Tempat Pengambilan Information Box */}
+                        <div className="p-4 bg-[#005BAC]/5 dark:bg-[#00BAC]/10 border border-[#005BAC]/15 rounded-xl space-y-2 text-left">
+                          <div className="flex items-center gap-2 text-[#005BAC] dark:text-[#8AB4F8] font-bold text-xs uppercase tracking-wider">
+                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                            <span>Lokasi Pengambilan KTM</span>
+                          </div>
+                          <p className="text-xs text-gray-700 dark:text-gray-300 font-semibold leading-relaxed">
+                            {facInfo.lokasi}
+                          </p>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
+                            Silakan klik tombol di bawah untuk menentukan sesi waktu pengambilan Anda di lokasi ini.
+                          </p>
+                        </div>
+
+                        <Button onClick={proceedToSchedule} className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold text-sm rounded-xl py-2.5 h-11 flex items-center justify-center gap-2">
+                          <span>Lanjut Pilih Sesi Jadwal</span>
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })()
               )}
             </div>
           )}

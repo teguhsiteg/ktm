@@ -1,17 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
-import { Booking, Mahasiswa } from '@/types';
+import { collection, onSnapshot, query, orderBy, writeBatch, doc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { Booking, Mahasiswa, Jadwal } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle, Clock } from 'lucide-react';
+import { Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle, Clock, Pencil, Plus, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
-import { isBookingExpired } from '@/lib/utils';
+import { isBookingExpired, generateBookingId } from '@/lib/utils';
 import { useAdmin } from '@/contexts/AdminContext';
 
 export default function BookingPage() {
@@ -41,6 +41,65 @@ export default function BookingPage() {
   // Bulk Selection States
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  // CRUD states
+  const [schedules, setSchedules] = useState<Jadwal[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Form Fields State
+  const [formMhsId, setFormMhsId] = useState('');
+  const [formJadwalId, setFormJadwalId] = useState('');
+  const [formWa, setFormWa] = useState('');
+  const [formStatus, setFormStatus] = useState<'Belum Diambil' | 'Sudah Diambil' | 'Hangus'>('Belum Diambil');
+  const [mhsSearch, setMhsSearch] = useState('');
+
+  // Fetch all schedules
+  useEffect(() => {
+    const q = query(collection(db, 'jadwal'), orderBy('tanggal', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Jadwal));
+      setSchedules(list);
+    });
+    return unsub;
+  }, []);
+
+  const filteredMhsList = useMemo(() => {
+    const list = Object.values(mahasiswaMap) as Mahasiswa[];
+    if (!mhsSearch.trim()) return list.slice(0, 5); // Default show top 5
+    const s = mhsSearch.toLowerCase();
+    return list.filter(m => 
+      m.nama?.toLowerCase().includes(s) || 
+      m.nim?.toLowerCase().includes(s) ||
+      m.prodi?.toLowerCase().includes(s)
+    ).slice(0, 10); // Show top 10 matches
+  }, [mahasiswaMap, mhsSearch]);
+
+  const resetForm = () => {
+    setEditingBooking(null);
+    setFormMhsId('');
+    setFormJadwalId('');
+    setFormWa('');
+    setFormStatus('Belum Diambil');
+    setMhsSearch('');
+  };
+
+  const handleOpenAddForm = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const handleOpenEditForm = (booking: Booking) => {
+    setEditingBooking(booking);
+    setFormMhsId(booking.mahasiswa_id);
+    setFormJadwalId(booking.jadwal_id);
+    setFormWa(booking.wa || '');
+    setFormStatus(booking.status);
+    setMhsSearch('');
+    setShowForm(true);
+  };
 
   useEffect(() => {
     // Fetch mahasiswa mapping first
@@ -250,6 +309,196 @@ export default function BookingPage() {
     }
   };
 
+  const handleSaveBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formMhsId) {
+      toast.error('Harap pilih mahasiswa terlebih dahulu');
+      return;
+    }
+    if (!formJadwalId) {
+      toast.error('Harap pilih sesi jadwal terlebih dahulu');
+      return;
+    }
+    const cleanWA = formWa.trim().replace(/[^0-9]/g, '');
+    if (!cleanWA) {
+      toast.error('Harap masukkan nomor WhatsApp');
+      return;
+    }
+    if (cleanWA.length < 10 || cleanWA.length > 14) {
+      toast.error('Nomor WhatsApp harus berukuran antara 10 - 14 karakter');
+      return;
+    }
+
+    const selectedJadwal = schedules.find(s => s.id === formJadwalId);
+    if (!selectedJadwal) {
+      toast.error('Jadwal tidak ditemukan');
+      return;
+    }
+
+    setFormLoading(true);
+    try {
+      if (editingBooking) {
+        // Edit mode
+        const oldJadwalId = editingBooking.jadwal_id;
+        const oldMhsId = editingBooking.mahasiswa_id;
+        const isJadwalChanged = oldJadwalId !== formJadwalId;
+        const isMhsChanged = oldMhsId !== formMhsId;
+
+        await runTransaction(db, async (transaction) => {
+          // If schedule changed, adjust booked_counts
+          if (isJadwalChanged) {
+            const oldJRef = doc(db, 'jadwal', oldJadwalId);
+            const newJRef = doc(db, 'jadwal', formJadwalId);
+
+            const oldJDoc = await transaction.get(oldJRef);
+            const newJDoc = await transaction.get(newJRef);
+
+            if (oldJDoc.exists()) {
+              const oldCount = oldJDoc.data().booked_count || 0;
+              transaction.update(oldJRef, { booked_count: Math.max(0, oldCount - 1) });
+            }
+            if (newJDoc.exists()) {
+              const newCount = newJDoc.data().booked_count || 0;
+              transaction.update(newJRef, { booked_count: newCount + 1 });
+            }
+          }
+
+          // Update booking document
+          const bookingRef = doc(db, 'booking', editingBooking.id);
+          transaction.update(bookingRef, {
+            mahasiswa_id: formMhsId,
+            jadwal_id: formJadwalId,
+            tanggal: selectedJadwal.tanggal,
+            jam: `${selectedJadwal.jam_mulai} - ${selectedJadwal.jam_selesai}`,
+            wa: cleanWA,
+            status: formStatus,
+            updated_at: serverTimestamp()
+          });
+
+          // Update KTM status for mahasiswa
+          const newMhsRef = doc(db, 'mahasiswa', formMhsId);
+          if (formStatus === 'Sudah Diambil') {
+            transaction.update(newMhsRef, {
+              status_ktm: 'Sudah diambil',
+              tanggal_ambil: serverTimestamp()
+            });
+          } else {
+            transaction.update(newMhsRef, {
+              status_ktm: 'Tersedia',
+              tanggal_ambil: null
+            });
+          }
+
+          // If student was changed, restore the old student's KTM status to Tersedia (since they don't have a booking anymore)
+          if (isMhsChanged) {
+            const oldMhsRef = doc(db, 'mahasiswa', oldMhsId);
+            transaction.update(oldMhsRef, {
+              status_ktm: 'Tersedia',
+              tanggal_ambil: null
+            });
+          }
+        });
+
+        toast.success('Booking berhasil diperbarui!');
+      } else {
+        // Create mode
+        // Check if student already has a booking
+        const duplicate = bookings.find(b => b.mahasiswa_id === formMhsId && b.status !== 'Hangus');
+        if (duplicate) {
+          toast.error(`Mahasiswa ini sudah memiliki booking aktif (ID: ${duplicate.booking_id})!`);
+          setFormLoading(false);
+          return;
+        }
+
+        const newId = generateBookingId();
+        await runTransaction(db, async (transaction) => {
+          const jRef = doc(db, 'jadwal', formJadwalId);
+          const jDoc = await transaction.get(jRef);
+          if (jDoc.exists()) {
+            const count = jDoc.data().booked_count || 0;
+            transaction.update(jRef, { booked_count: count + 1 });
+          }
+
+          const newBookingRef = doc(collection(db, 'booking'));
+          transaction.set(newBookingRef, {
+            booking_id: newId,
+            mahasiswa_id: formMhsId,
+            jadwal_id: formJadwalId,
+            tanggal: selectedJadwal.tanggal,
+            jam: `${selectedJadwal.jam_mulai} - ${selectedJadwal.jam_selesai}`,
+            wa: cleanWA,
+            status: formStatus,
+            qr_token: newId,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+          });
+
+          const mhsRef = doc(db, 'mahasiswa', formMhsId);
+          if (formStatus === 'Sudah Diambil') {
+            transaction.update(mhsRef, {
+              status_ktm: 'Sudah diambil',
+              tanggal_ambil: serverTimestamp()
+            });
+          } else {
+            transaction.update(mhsRef, {
+              status_ktm: 'Tersedia',
+              tanggal_ambil: null
+            });
+          }
+        });
+
+        toast.success('Booking manual berhasil ditambahkan!');
+      }
+
+      setShowForm(false);
+      resetForm();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Gagal menyimpan booking');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const executeSingleDelete = async () => {
+    if (!deletingId) return;
+    const b = bookings.find(item => item.id === deletingId);
+    if (!b) return;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // 1. Decrement booked_count of schedule
+        if (b.jadwal_id) {
+          const jRef = doc(db, 'jadwal', b.jadwal_id);
+          const jDoc = await transaction.get(jRef);
+          if (jDoc.exists()) {
+            const count = jDoc.data().booked_count || 0;
+            transaction.update(jRef, { booked_count: Math.max(0, count - 1) });
+          }
+        }
+
+        // 2. Restore mahasiswa status_ktm to 'Tersedia'
+        if (b.mahasiswa_id) {
+          const mRef = doc(db, 'mahasiswa', b.mahasiswa_id);
+          transaction.update(mRef, {
+            status_ktm: 'Tersedia',
+            tanggal_ambil: null
+          });
+        }
+
+        // 3. Delete booking
+        const bookingRef = doc(db, 'booking', b.id);
+        transaction.delete(bookingRef);
+      });
+
+      toast.success('Booking berhasil dihapus');
+      setDeletingId(null);
+    } catch (e) {
+      console.error('Failed to delete booking:', e);
+      toast.error('Gagal menghapus data booking');
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [filter, itemsPerPage]);
@@ -344,6 +593,15 @@ export default function BookingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            <Button 
+              onClick={handleOpenAddForm} 
+              variant="default" 
+              size="sm" 
+              className="rounded-xl w-full sm:w-auto bg-[#005BAC] hover:bg-[#004B8C] text-white font-medium"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Tambah Booking Manual
+            </Button>
             <Button onClick={handleExport} disabled={exporting || processedData.length === 0} variant="outline" size="sm" className="rounded-xl w-full sm:w-auto">
               <Download className="w-4 h-4 mr-2" />
               {exporting ? 'Exporting...' : 'Export Filtered Data'}
@@ -502,13 +760,14 @@ export default function BookingPage() {
                 <th className="px-6 py-3 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('status')}>
                   Status <SortIndicator columnKey="status" />
                 </th>
+                <th className="px-6 py-3 font-medium text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-4 text-center dark:text-gray-400">Memuat data...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-4 text-center dark:text-gray-400">Memuat data...</td></tr>
               ) : currentData.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-4 text-center dark:text-gray-400">Data kosong</td></tr>
+                <tr><td colSpan={8} className="px-6 py-4 text-center dark:text-gray-400">Data kosong</td></tr>
               ) : (
                 currentData.map((b, idx) => (
                   <tr key={b.id} className={`hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors duration-150 ${b.id && selectedIds.includes(b.id) ? 'bg-blue-50/30 dark:bg-[#005BAC]/5' : ''}`}>
@@ -525,11 +784,37 @@ export default function BookingPage() {
                     </td>
                     <td className="px-6 py-4 font-mono text-xs text-[#005BAC] dark:text-[#8AB4F8] font-bold">{b.booking_id}</td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 dark:text-gray-100">{b.mhs?.nama}</div>
-                      <div className="text-gray-500 dark:text-gray-400 text-xs">{b.mhs?.nim} • {b.mhs?.prodi}</div>
+                      {b.mhs ? (
+                        <>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            {(!b.mhs.nama || b.mhs.nama.trim() === '.' || b.mhs.nama.trim() === '') ? (
+                              <span className="text-amber-600 dark:text-amber-400 font-semibold text-xs italic bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded">
+                                Nama Belum Diisi / Tidak Valid
+                              </span>
+                            ) : (
+                              b.mhs.nama
+                            )}
+                          </div>
+                          <div className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
+                            {b.mhs.nim ? b.mhs.nim : <span className="text-gray-400 italic">NIM Kosong</span>} • {b.mhs.prodi ? b.mhs.prodi : <span className="text-gray-400 italic">Prodi Kosong</span>}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-medium text-red-600 dark:text-red-400 font-bold text-xs bg-red-50 dark:bg-red-950/20 w-fit px-2 py-0.5 rounded">
+                            Mahasiswa Terhapus / Tidak Ditemukan
+                          </div>
+                          <div className="text-gray-400 dark:text-gray-500 text-[10px] mt-1 font-mono">
+                            ID: {b.mahasiswa_id || 'N/A'}
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td className="px-6 py-4 dark:text-gray-200">
                       {(() => {
+                        if (!b.wa || b.wa.trim() === '') {
+                          return <span className="text-gray-400 dark:text-gray-600 font-mono">-</span>;
+                        }
                         const formattedTanggal = (() => {
                           try {
                             return format(parseISO(b.tanggal), 'd MMMM yyyy', { locale: localeID });
@@ -538,7 +823,8 @@ export default function BookingPage() {
                           }
                         })();
                         const cleanJam = b.jam.toLowerCase().includes('wib') ? b.jam : `${b.jam} WIB`;
-                        const waText = `Halo ${b.mhs?.nama || ''} ${b.mhs?.nim || ''}, Kami dari Admin Distribusi KTM UII. Kami ingin menginformasikan jadwal pengambilan KTM Anda yang telah terkonfirmasi pada:\n\n📅 Tanggal: ${formattedTanggal}\n⏰ Sesi Waktu: ${cleanJam}\n\nMohon hadir tepat waktu dan siapkan QR Tiket Anda. Terima kasih!`;
+                        const targetNama = (!b.mhs?.nama || b.mhs.nama.trim() === '.' || b.mhs.nama.trim() === '') ? '' : b.mhs.nama;
+                        const waText = `Halo ${targetNama} ${b.mhs?.nim || ''}, Kami dari Admin Distribusi KTM UII. Kami ingin menginformasikan jadwal pengambilan KTM Anda yang telah terkonfirmasi pada:\n\n📅 Tanggal: ${formattedTanggal}\n⏰ Sesi Waktu: ${cleanJam}\n\nMohon hadir tepat waktu dan siapkan QR Tiket Anda. Terima kasih!`;
                         const cleanNumber = (b.wa || '').replace(/\D/g, '');
                         const waPhone = cleanNumber.startsWith('0') ? '62' + cleanNumber.slice(1) : cleanNumber;
                         return (
@@ -567,6 +853,26 @@ export default function BookingPage() {
                             Diambil: {formatClaimTime(b.updated_at)}
                           </span>
                         )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-[#005BAC]/10 rounded-lg"
+                          onClick={() => handleOpenEditForm(b)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"
+                          onClick={() => setDeletingId(b.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -615,6 +921,178 @@ export default function BookingPage() {
         cancelText="Batal"
         variant="danger"
       />
+
+      <ConfirmationModal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        onConfirm={executeSingleDelete}
+        title="Hapus Booking"
+        description="Apakah Anda yakin ingin menghapus data booking ini? Tindakan ini akan mengembalikan status KTM mahasiswa menjadi Tersedia dan mengurangi jumlah kuota terisi pada sesi jadwal terkait."
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        variant="danger"
+      />
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-800 shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-50 dark:bg-[#252525] border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex flex-row items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#005BAC]" />
+                {editingBooking ? 'Edit Data Booking' : 'Tambah Booking Manual'}
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleSaveBooking} className="p-6 space-y-4">
+              {/* Select Student section */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mahasiswa</label>
+                {editingBooking ? (
+                  <div className="p-3 bg-gray-50 dark:bg-[#2A2A2A] rounded-xl border border-gray-200 dark:border-gray-800 text-sm">
+                    <p className="font-bold text-gray-900 dark:text-white">{mahasiswaMap[formMhsId]?.nama || 'Mahasiswa tidak ditemukan'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">NIM: {mahasiswaMap[formMhsId]?.nim || formMhsId}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder="Cari mahasiswa berdasarkan Nama / NIM..."
+                        value={mhsSearch}
+                        onChange={(e) => setMhsSearch(e.target.value)}
+                        className="pl-10 dark:bg-[#2A2A2A] dark:border-gray-800 rounded-xl"
+                      />
+                    </div>
+
+                    {/* Filtered list of students */}
+                    <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-50 dark:divide-gray-800/40">
+                      {filteredMhsList.length === 0 ? (
+                        <p className="p-3 text-center text-xs text-gray-400">Tidak ada mahasiswa yang cocok</p>
+                      ) : (
+                        filteredMhsList.map(m => {
+                          const isSelected = formMhsId === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setFormMhsId(m.id);
+                                if (m.wa) {
+                                  setFormWa(m.wa);
+                                }
+                              }}
+                              className={`w-full text-left p-2.5 text-xs transition-colors flex items-center justify-between ${
+                                isSelected 
+                                  ? 'bg-[#005BAC]/5 dark:bg-[#005BAC]/15 font-bold border-l-2 border-[#005BAC]' 
+                                  : 'hover:bg-slate-50 dark:hover:bg-[#2A2A2A]/50'
+                              }`}
+                            >
+                              <div>
+                                <p className="text-gray-900 dark:text-gray-100">{m.nama}</p>
+                                <p className="text-gray-400 font-mono mt-0.5">{m.nim} • {m.prodi}</p>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-[#005BAC]" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Select Schedule */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sesi Jadwal Pengambilan</label>
+                <select 
+                  className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                  value={formJadwalId}
+                  onChange={e => setFormJadwalId(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>-- Pilih Sesi Jadwal --</option>
+                  {schedules.map(s => {
+                    const dateFormatted = (() => {
+                      try {
+                        return format(parseISO(s.tanggal), 'dd MMM yyyy', { locale: localeID });
+                      } catch (e) {
+                        return s.tanggal;
+                      }
+                    })();
+                    return (
+                      <option key={s.id} value={s.id} className="dark:bg-[#1E1E1E]">
+                        {dateFormatted} ({s.jam_mulai} - {s.jam_selesai}) | Kuota: {s.booked_count || 0}/{s.kuota}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* WA Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">No. WhatsApp Aktif</label>
+                <Input
+                  placeholder="Contoh: 081234567890"
+                  value={formWa}
+                  onChange={e => setFormWa(e.target.value)}
+                  required
+                  className="dark:bg-[#2A2A2A] dark:border-gray-800 rounded-xl"
+                />
+              </div>
+
+              {/* Status */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status Pengambilan KTM</label>
+                <select 
+                  className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                  value={formStatus}
+                  onChange={e => setFormStatus(e.target.value as any)}
+                  required
+                >
+                  <option value="Belum Diambil" className="dark:bg-[#1E1E1E]">Belum Diambil</option>
+                  <option value="Sudah Diambil" className="dark:bg-[#1E1E1E]">Sudah Diambil</option>
+                  <option value="Hangus" className="dark:bg-[#1E1E1E]">Hangus</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-800 justify-end">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="rounded-xl"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  disabled={formLoading}
+                >
+                  Batal
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="rounded-xl bg-[#005BAC] hover:bg-[#004B8C] text-white"
+                  disabled={formLoading}
+                >
+                  {formLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -146,8 +146,9 @@ export default function LoginPage() {
             </form>
           </div>
           
-          <div className="mt-8 text-center text-[13px] text-gray-400 dark:text-gray-500 font-medium">
-            &copy; {new Date().getFullYear()} Universitas Islam Indonesia.
+          <div className="mt-8 text-center space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+            <p>Developed by Guwigo Teknologi Indonesia</p>
+            <p>&copy; {new Date().getFullYear()} Universitas Islam Indonesia. All rights reserved.</p>
           </div>
         </div>
       </div>

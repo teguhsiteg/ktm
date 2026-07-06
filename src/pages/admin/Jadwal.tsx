@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Jadwal } from '@/types';
 import { toast } from 'sonner';
 import { 
@@ -115,6 +115,28 @@ export default function JadwalPage() {
           kuota: Number(formData.kuota),
           updated_at: serverTimestamp()
         });
+
+        // Update all associated bookings
+        try {
+          const bookingQuery = query(collection(db, 'booking'), where('jadwal_id', '==', editingId));
+          const bookingSnap = await getDocs(bookingQuery);
+          if (!bookingSnap.empty) {
+            const batch = writeBatch(db);
+            const formattedJam = `${formData.jam_mulai} - ${formData.jam_selesai}`;
+            bookingSnap.docs.forEach((bookingDoc) => {
+              batch.update(bookingDoc.ref, {
+                tanggal: formData.tanggal,
+                jam: formattedJam,
+                updated_at: serverTimestamp()
+              });
+            });
+            await batch.commit();
+            console.log(`Successfully updated ${bookingSnap.size} associated booking documents.`);
+          }
+        } catch (bookingErr) {
+          console.error('Failed to update associated bookings:', bookingErr);
+        }
+
         toast.success('Jadwal berhasil diperbarui');
       } else {
         await addDoc(collection(db, 'jadwal'), {

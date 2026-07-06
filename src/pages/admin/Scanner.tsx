@@ -8,7 +8,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, serv
 import { Booking, Mahasiswa } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Scan, AlertCircle, RotateCcw, Trash2, Clock, Check, ArrowRight, Search, FileSpreadsheet, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, Scan, AlertCircle, RotateCcw, Trash2, Clock, Check, ArrowRight, Search, FileSpreadsheet, Eye, CalendarDays, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { isBookingNotStartedYet, isBookingExpired } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -37,6 +37,10 @@ export default function ScannerPage() {
   const autoResetTimeoutRef = useRef<any>(null);
 
   const prevQueueLengthRef = useRef(0);
+
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [sessionStats, setSessionStats] = useState<{[key: string]: { booked: number, taken: number }}>({});
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const filteredHistoryLogs = useMemo(() => {
     if (!historySearch.trim()) return recentLogs;
@@ -67,6 +71,115 @@ export default function ScannerPage() {
       }
     };
   }, []);
+
+  // Real-time local time tracking for active session determination & countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // 1 second refresh for real-time countdown
+    return () => clearInterval(timer);
+  }, []);
+
+  // Subscribe to all active schedules
+  useEffect(() => {
+    const q = query(
+      collection(db, 'jadwal'),
+      where('status', '==', 'Aktif')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setSchedules(items);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Today's date in 'YYYY-MM-DD'
+  const todayStr = useMemo(() => format(currentTime, 'yyyy-MM-dd'), [currentTime]);
+
+  // Today's active schedules
+  const todaysSchedules = useMemo(() => {
+    return schedules
+      .filter(s => s.tanggal === todayStr)
+      .sort((a, b) => a.jam_mulai.localeCompare(b.jam_mulai));
+  }, [schedules, todayStr]);
+
+  // Real-time booking tracking for today's schedules
+  useEffect(() => {
+    if (todaysSchedules.length === 0) {
+      setSessionStats({});
+      return;
+    }
+    
+    const q = query(
+      collection(db, 'booking'),
+      where('tanggal', '==', todayStr)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const stats: {[key: string]: { booked: number, taken: number }} = {};
+      
+      // Initialize
+      todaysSchedules.forEach(s => {
+        stats[s.id] = { booked: 0, taken: 0 };
+      });
+      
+      snapshot.forEach(docSnap => {
+        const b = docSnap.data();
+        const jId = b.jadwal_id;
+        if (jId && stats[jId]) {
+          stats[jId].booked += 1;
+          if (b.status === 'Sudah Diambil') {
+            stats[jId].taken += 1;
+          }
+        } else if (jId) {
+          stats[jId] = stats[jId] || { booked: 0, taken: 0 };
+          stats[jId].booked += 1;
+          if (b.status === 'Sudah Diambil') {
+            stats[jId].taken += 1;
+          }
+        }
+      });
+      
+      setSessionStats(stats);
+    });
+    
+    return () => unsubscribe();
+  }, [todaysSchedules, todayStr]);
+
+  // Determine current active session (within time range)
+  const activeSession = useMemo(() => {
+    const curTimeStr = format(currentTime, 'HH:mm');
+    return todaysSchedules.find(s => s.jam_mulai <= curTimeStr && curTimeStr <= s.jam_selesai);
+  }, [todaysSchedules, currentTime]);
+
+  // Determine next upcoming session today
+  const nextSession = useMemo(() => {
+    const curTimeStr = format(currentTime, 'HH:mm');
+    return todaysSchedules.find(s => s.jam_mulai > curTimeStr);
+  }, [todaysSchedules, currentTime]);
+
+  // Helper for countdown
+  const getRemainingTimeText = (targetTimeStr: string, now: Date) => {
+    const [hours, minutes] = targetTimeStr.split(':').map(Number);
+    const targetDate = new Date(now);
+    targetDate.setHours(hours, minutes, 0, 0);
+    
+    const diffMs = targetDate.getTime() - now.getTime();
+    if (diffMs <= 0) return '00m 00d';
+    
+    const diffSecs = Math.floor(diffMs / 1000);
+    const h = Math.floor(diffSecs / 3600);
+    const m = Math.floor((diffSecs % 3600) / 60);
+    const s = diffSecs % 60;
+    
+    const hStr = h > 0 ? `${h}j ` : '';
+    const mStr = `${m}m `;
+    const sStr = `${s}d`;
+    return `${hStr}${mStr}${sStr}`;
+  };
 
   useEffect(() => {
     const q = query(
@@ -656,6 +769,159 @@ export default function ScannerPage() {
             Pindai QR Code tiket mahasiswa secara real-time atau pantau antrean penyerahan KTM langsung dari terminal scan publik.
           </p>
         </div>
+      </div>
+
+      {/* Active Session Info Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Active Session Card */}
+        <Card className="md:col-span-2 bg-white dark:bg-[#1E1E1E] dark:border-gray-800 shadow-sm overflow-hidden border-l-4 border-l-[#005BAC] rounded-2xl">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="space-y-1.5 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    {activeSession ? (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </>
+                    ) : (
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    )}
+                  </span>
+                  <span className={`text-[10px] font-extrabold uppercase tracking-wider ${activeSession ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {activeSession ? 'Sesi Sedang Berlangsung' : 'Tidak Ada Sesi Jam Ini'}
+                  </span>
+                </div>
+                {activeSession ? (
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2 leading-none">
+                      <Clock className="w-5 h-5 text-[#005BAC]" />
+                      Sesi {todaysSchedules.indexOf(activeSession) + 1}: {activeSession.jam_mulai} - {activeSession.jam_selesai} WIB
+                    </h3>
+                    <div className="text-xs text-gray-450 dark:text-gray-500 mt-2 flex flex-wrap items-center gap-2">
+                      <span>Hari ini, {format(currentTime, 'EEEE, dd MMMM yyyy', { locale: localeID })}</span>
+                      <span className="text-gray-300 dark:text-gray-700 hidden sm:inline">•</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[11px] font-mono inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        Sisa Waktu: {getRemainingTimeText(activeSession.jam_selesai, currentTime)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-sm font-extrabold text-gray-800 dark:text-gray-200">
+                      Standby Mode / Di Luar Jam Sesi
+                    </h3>
+                    <div className="text-xs text-gray-450 dark:text-gray-500 mt-1 space-y-1">
+                      <p>
+                        {todaysSchedules.length > 0 
+                          ? `Terdapat ${todaysSchedules.length} sesi terjadwal hari ini.`
+                          : 'Tidak ada jadwal pengambilan KTM yang aktif untuk hari ini.'
+                        }
+                      </p>
+                      {nextSession && (
+                        <p className="inline-flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full text-[11px] font-mono mt-1">
+                          ⏱️ Sesi {todaysSchedules.indexOf(nextSession) + 1} ({nextSession.jam_mulai}) dimulai dalam: {getRemainingTimeText(nextSession.jam_mulai, currentTime)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress and Stats for Active Session */}
+              {activeSession && (
+                <div className="w-full sm:w-56 space-y-1.5 text-left sm:text-right">
+                  <div className="flex justify-between sm:justify-end gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                    <span className="sm:hidden">Progress Penyerahan:</span>
+                    <span>
+                      {sessionStats[activeSession.id]?.taken || 0} / {sessionStats[activeSession.id]?.booked || 0} Mahasiswa
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full bg-gray-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-[#005BAC] to-emerald-500 h-full rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${
+                          (sessionStats[activeSession.id]?.booked || 0) > 0 
+                            ? Math.min(100, ((sessionStats[activeSession.id]?.taken || 0) / (sessionStats[activeSession.id]?.booked || 0)) * 100)
+                            : 0
+                        }%` 
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    {(sessionStats[activeSession.id]?.booked || 0) - (sessionStats[activeSession.id]?.taken || 0)} mahasiswa belum mengambil KTM pada sesi ini.
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Schedule List Card for Today */}
+        <Card className="bg-white dark:bg-[#1E1E1E] dark:border-gray-800 shadow-sm overflow-hidden rounded-2xl">
+          <CardHeader className="py-3 px-4 bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
+            <CardTitle className="text-xs font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-[#005BAC]" />
+                Semua Sesi Hari Ini
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-850 text-[10px] font-extrabold font-mono text-gray-500">
+                {todaysSchedules.length} Sesi
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-y-auto max-h-[110px]">
+            {todaysSchedules.length === 0 ? (
+              <div className="py-6 px-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                Tidak ada sesi pengambilan terjadwal untuk hari ini.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50 dark:divide-gray-800/40">
+                {todaysSchedules.map((s, idx) => {
+                  const isActive = activeSession?.id === s.id;
+                  const stats = sessionStats[s.id] || { booked: 0, taken: 0 };
+                  const isDone = format(currentTime, 'HH:mm') > s.jam_selesai;
+                  
+                  return (
+                    <div 
+                      key={s.id} 
+                      className={`p-2 flex items-center justify-between gap-2 text-xs transition-colors ${
+                        isActive 
+                          ? 'bg-[#005BAC]/5 dark:bg-[#005BAC]/10 font-bold' 
+                          : 'hover:bg-slate-50/50 dark:hover:bg-zinc-800/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          isActive ? 'bg-emerald-500 animate-pulse' : isDone ? 'bg-gray-300' : 'bg-slate-400'
+                        }`} />
+                        <span className="text-gray-400 font-medium text-[10px]">Sesi {idx + 1}</span>
+                        <span className={`font-mono text-gray-800 dark:text-gray-200 text-[11px] ${isActive ? 'font-black' : ''}`}>
+                          {s.jam_mulai} - {s.jam_selesai}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isActive && (
+                          <span className="text-[8px] font-extrabold uppercase bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-200">
+                            AKTIF
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-500 font-semibold bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                          {stats.taken}/{stats.booked}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

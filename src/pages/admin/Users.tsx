@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { db, app } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Trash2, UserPlus, Shield, UserCog } from 'lucide-react';
+import { Trash2, Pencil, UserPlus, Shield, UserCog, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 const secondaryApp = initializeApp(app.options, "Secondary");
 const secondaryAuth = getAuth(secondaryApp);
@@ -24,12 +25,29 @@ interface AdminUser {
   last_logout?: string;
 }
 
+const LIST_FAKULTAS = [
+  'Fakultas Teknologi Industri (FTI)',
+  'Fakultas Teknik Sipil dan Perencanaan (FTSP)',
+  'Fakultas Matematika dan Ilmu Pengetahuan Alam (FMIPA)',
+  'Fakultas Kedokteran (FK)',
+  'Fakultas Hukum (FH)',
+  'Fakultas Bisnis dan Ekonomika (FBE)',
+  'Fakultas Psikologi',
+  'Fakultas Ilmu Agama Islam (FIAI)',
+  'Fakultas Ilmu Sosial Budaya',
+  'Universitas Islam Indonesia'
+];
+
 export default function UsersPage() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('admin');
   const [fakultas, setFakultas] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [dbFaculties, setDbFaculties] = useState<string[]>([]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'admins'), (snapshot) => {
@@ -42,43 +60,79 @@ export default function UsersPage() {
     return () => unsub();
   }, []);
 
-  const handleCreateAdmin = async (e: FormEvent) => {
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'prodi_mapping'), (snapshot) => {
+      const facs = new Set<string>();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.fakultas) {
+          facs.add(data.fakultas.trim());
+        }
+      });
+      setDbFaculties(Array.from(facs).sort());
+    });
+    return () => unsub();
+  }, []);
+
+  const selectOptions = dbFaculties.length > 0 ? dbFaculties : LIST_FAKULTAS;
+
+  const handleSaveAdmin = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !fakultas) {
-      toast.error('Mohon isi email, password, dan fakultas');
+    if (!email || !role) {
+      toast.error('Mohon isi email dan role');
       return;
     }
+    if (role === 'admin' && !fakultas) {
+      toast.error('Mohon pilih fakultas untuk Admin Fakultas');
+      return;
+    }
+
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      const uid = userCredential.user.uid;
-      
-      await setDoc(doc(db, 'admins', uid), {
-        email,
-        role: 'admin',
-        fakultas
-      });
+      if (editingAdmin) {
+        // UPDATE (Edit Mode)
+        await setDoc(doc(db, 'admins', editingAdmin.id), {
+          email,
+          role,
+          fakultas: role === 'super_admin' ? 'Semua' : fakultas
+        }, { merge: true });
 
-      await signOut(secondaryAuth);
-      
-      toast.success('Admin Fakultas berhasil ditambahkan');
-      setEmail('');
-      setPassword('');
-      setFakultas('');
+        toast.success('Akses admin berhasil diperbarui');
+        resetForm();
+      } else {
+        // CREATE (Tambah Mode)
+        if (!password) {
+          toast.error('Mohon isi password');
+          setLoading(false);
+          return;
+        }
+
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        const uid = userCredential.user.uid;
+        
+        await setDoc(doc(db, 'admins', uid), {
+          email,
+          role,
+          fakultas: role === 'super_admin' ? 'Semua' : fakultas
+        });
+
+        await signOut(secondaryAuth);
+        
+        toast.success('Admin Fakultas berhasil ditambahkan');
+        resetForm();
+      }
     } catch (error: any) {
       console.error(error);
-      if (error.code === 'auth/email-already-in-use') {
+      if (!editingAdmin && error.code === 'auth/email-already-in-use') {
         try {
           // User already exists in Auth, just give them admin access
           await setDoc(doc(db, 'admins', email), {
             email,
-            role: 'admin',
-            fakultas
+            role,
+            fakultas: role === 'super_admin' ? 'Semua' : fakultas
           });
           toast.success('Email sudah terdaftar. Akses admin berhasil ditambahkan.');
-          setEmail('');
-          setPassword('');
-          setFakultas('');
+          resetForm();
         } catch (dbError) {
           toast.error('Gagal menambahkan ke database.');
         }
@@ -90,18 +144,39 @@ export default function UsersPage() {
     }
   };
 
-  const handleDelete = async (id: string, adminRole: string) => {
+  const handleEdit = (admin: AdminUser) => {
+    setEditingAdmin(admin);
+    setEmail(admin.email);
+    setRole(admin.role || 'admin');
+    setFakultas(admin.fakultas === 'Semua' ? '' : admin.fakultas || '');
+    setPassword('');
+  };
+
+  const resetForm = () => {
+    setEditingAdmin(null);
+    setEmail('');
+    setPassword('');
+    setRole('admin');
+    setFakultas('');
+  };
+
+  const handleDelete = (id: string, adminRole: string) => {
     if (adminRole === 'super_admin') {
       toast.error('Super Admin tidak bisa dihapus dari sini');
       return;
     }
-    if (confirm('Yakin ingin menghapus akses admin ini? (Data auth tidak terhapus, hanya akses db)')) {
-      try {
-        await deleteDoc(doc(db, 'admins', id));
-        toast.success('Akses admin dicabut');
-      } catch (e) {
-        toast.error('Gagal mencabut akses');
-      }
+    setDeletingId(id);
+  };
+
+  const executeDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await deleteDoc(doc(db, 'admins', deletingId));
+      toast.success('Akses admin dicabut');
+    } catch (e) {
+      toast.error('Gagal mencabut akses');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -110,43 +185,136 @@ export default function UsersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Manajemen Admin</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">Kelola akses admin per Fakultas</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium font-sans">Kelola dan atur hak akses administrator sistem</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1A1A1A]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-[#005BAC] dark:text-[#8AB4F8]" />
-              Tambah Admin Fakultas
-            </CardTitle>
-            <p className="text-sm text-gray-500">Buat akun khusus untuk admin fakultas</p>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2 font-sans font-bold">
+                {editingAdmin ? (
+                  <>
+                    <Pencil className="w-5 h-5 text-[#005BAC] dark:text-[#8AB4F8]" />
+                    Edit Admin
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-5 h-5 text-[#005BAC] dark:text-[#8AB4F8]" />
+                    Tambah Admin
+                  </>
+                )}
+              </CardTitle>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {editingAdmin ? 'Perbarui informasi dan hak akses admin' : 'Buat akun khusus untuk admin baru'}
+              </p>
+            </div>
+            {editingAdmin && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 rounded-full" 
+                onClick={resetForm}
+                title="Batal Edit"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreateAdmin} className="space-y-4">
+            <form onSubmit={handleSaveAdmin} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin.fti@uii.ac.id" required />
+                <Input 
+                  type="email" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  placeholder="admin.fti@uii.ac.id" 
+                  required 
+                  className="rounded-xl"
+                />
               </div>
+
+              {!editingAdmin && (
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input 
+                    type="password" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder="••••••••" 
+                    required 
+                    minLength={6} 
+                    className="rounded-xl"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>Password</Label>
-                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
+                <Label>Role Akses</Label>
+                <select
+                  value={role}
+                  onChange={e => {
+                    const selectedRole = e.target.value;
+                    setRole(selectedRole);
+                    if (selectedRole === 'super_admin') {
+                      setFakultas('Semua');
+                    } else {
+                      setFakultas('');
+                    }
+                  }}
+                  className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                  required
+                >
+                  <option value="admin">Admin Fakultas</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
               </div>
-              <div className="space-y-2">
-                <Label>Keyword Akses Prodi (Koma jika lebih dari satu)</Label>
-                <Input value={fakultas} onChange={e => setFakultas(e.target.value)} placeholder="Misal: FTI, Informatika, Hukum" required />
+
+              {role === 'admin' && (
+                <div className="space-y-2 animate-in fade-in duration-200">
+                  <Label>Fakultas / Unit Kerja</Label>
+                  <select
+                    value={fakultas}
+                    onChange={e => setFakultas(e.target.value)}
+                    className="flex h-10 w-full rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    required
+                  >
+                    <option value="" disabled>-- Pilih Fakultas --</option>
+                    {selectOptions.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                {editingAdmin && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={resetForm}
+                    className="flex-1 rounded-xl"
+                  >
+                    Batal
+                  </Button>
+                )}
+                <Button 
+                  type="submit" 
+                  disabled={loading} 
+                  className={`rounded-xl text-white ${editingAdmin ? 'flex-1 bg-amber-600 hover:bg-amber-700' : 'w-full bg-[#005BAC] hover:bg-[#004A8C]'}`}
+                >
+                  {loading ? 'Memproses...' : editingAdmin ? 'Simpan Perubahan' : 'Buat Akun'}
+                </Button>
               </div>
-              <Button type="submit" disabled={loading} className="w-full bg-[#005BAC] hover:bg-[#004A8C] text-white">
-                {loading ? 'Memproses...' : 'Buat Akun'}
-              </Button>
             </form>
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1A1A1A]">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="text-lg flex items-center gap-2 font-sans font-bold">
               <UserCog className="w-5 h-5 text-gray-500" />
               Daftar Admin
             </CardTitle>
@@ -178,7 +346,7 @@ export default function UsersPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-medium">
                         {admin.fakultas || '-'}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
@@ -188,21 +356,30 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {admin.role !== 'super_admin' && (
+                        <div className="flex justify-end gap-2">
                           <button 
-                            onClick={() => handleDelete(admin.id, admin.role)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                            title="Hapus Akses"
+                            onClick={() => handleEdit(admin)}
+                            className="text-amber-600 hover:text-amber-700 p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            title="Edit Admin"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Pencil className="w-4 h-4" />
                           </button>
-                        )}
+                          {admin.role !== 'super_admin' && (
+                            <button 
+                              onClick={() => handleDelete(admin.id, admin.role)}
+                              className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Hapus Akses"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {admins.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">Belum ada data admin.</td>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Belum ada data admin.</td>
                     </tr>
                   )}
                 </tbody>
@@ -211,6 +388,16 @@ export default function UsersPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        onConfirm={executeDelete}
+        title="Cabut Akses Admin"
+        description="Apakah Anda yakin ingin mencabut hak akses administrator untuk akun ini? Akun tersebut tidak akan lagi memiliki wewenang untuk masuk ke panel admin."
+        confirmText="Ya, Cabut"
+        cancelText="Batal"
+      />
     </div>
   );
 }
