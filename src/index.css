@@ -81,3 +81,12 @@
   color: #f3f4f6 !important;
   border-color: #374151 !important;
 }
+
+/* Hide scrollbar for mobile navigation */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

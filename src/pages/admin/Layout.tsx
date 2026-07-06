@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon, UserCircle, MapPin, Settings, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Ticket, ScanLine, LogOut, Download, Sun, Moon, UserCircle, MapPin, Settings, Building2, Menu, X } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -16,6 +16,7 @@ export default function AdminLayout() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('admin_theme') === 'dark';
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { adminData, loadingAdmin, adminId } = useAdmin();
 
@@ -82,21 +83,37 @@ export default function AdminLayout() {
 
   return (
     <div className="h-[100dvh] w-full overflow-hidden bg-[#F8F9FA] dark:bg-[#121212] flex flex-col md:flex-row  text-[#3C4043] dark:text-[#E0E0E0] transition-colors duration-200">
-      {/* Sidebar Modern SaaS style - hidden on mobile, visible on desktop */}
-      <aside className="w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col hidden md:flex h-full sticky top-0 transition-colors duration-200">
-        <div className="p-6 flex items-center space-x-3 border-b border-gray-200 dark:border-gray-800/60">
-          <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
-            <img 
-              src="/logo-uii.png" 
-              alt="Logo UII" 
-              className="w-7 h-7 object-contain"
-              referrerPolicy="no-referrer"
-            />
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Modern SaaS style - hidden on mobile unless open, visible on desktop */}
+      <aside className={`fixed md:sticky top-0 left-0 w-[260px] bg-white dark:bg-[#1A1A1A] border-r border-gray-200 dark:border-gray-800/60 flex flex-col h-full z-40 transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className="p-6 flex items-center justify-between border-b border-gray-200 dark:border-gray-800/60">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
+              <img 
+                src="/logo-uii.png" 
+                alt="Logo UII" 
+                className="w-7 h-7 object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div>
+              <h1 className="text-[14px] font-extrabold text-gray-900 dark:text-gray-100 leading-tight tracking-tight">KTM Booking</h1>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Admin Portal</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-[14px] font-extrabold text-gray-900 dark:text-gray-100 leading-tight tracking-tight">KTM Booking</h1>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Admin Portal</p>
-          </div>
+          <button 
+            onClick={() => setMobileMenuOpen(false)} 
+            className="md:hidden p-2 -mr-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
         
         <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5">
@@ -107,6 +124,7 @@ export default function AdminLayout() {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={() => setMobileMenuOpen(false)}
                 className={`group flex items-center px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   active 
                     ? 'bg-[#005BAC] text-white shadow-md shadow-[#005BAC]/20' 
@@ -143,17 +161,25 @@ export default function AdminLayout() {
       </aside>
 
       {/* Mobile Header - only visible on mobile */}
-      <header className="h-[60px] flex-shrink-0 bg-white dark:bg-[#1A1A1A] border-b border-gray-200 dark:border-gray-800/60 px-4 flex md:hidden items-center justify-between z-20 transition-colors duration-200">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
-            <img 
-              src="/logo-uii.png" 
-              alt="Logo UII" 
-              className="w-5 h-5 object-contain"
-              referrerPolicy="no-referrer"
-            />
+      <header className="h-[60px] flex-shrink-0 bg-white dark:bg-[#1A1A1A] border-b border-gray-200 dark:border-gray-800/60 px-4 flex md:hidden items-center justify-between z-20 transition-colors duration-200 relative">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-1.5 -ml-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 bg-transparent hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-[#E8F0FE] dark:bg-[#005BAC]/15 flex items-center justify-center shrink-0">
+              <img 
+                src="/logo-uii.png" 
+                alt="Logo UII" 
+                className="w-4 h-4 object-contain"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <h1 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">KTM Admin</h1>
           </div>
-          <h1 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">KTM Admin</h1>
         </div>
         <div className="flex items-center space-x-1.5">
           {/* Real-time Clock for Mobile Header */}
@@ -225,38 +251,9 @@ export default function AdminLayout() {
         </header>
 
         {/* Content Wrapper */}
-        <div className="p-4 md:p-8 flex-1 overflow-y-auto md:pb-8">
+        <div className="p-4 md:p-8 flex-1 overflow-y-auto pb-6 md:pb-8">
           <Outlet />
         </div>
-
-        {/* Mobile Bottom Navigation - only visible on mobile/tablets */}
-        <nav className="h-[calc(70px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] flex-shrink-0 bg-white/90 dark:bg-[#1A1A1A]/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800/60 flex md:hidden items-center justify-around px-2 z-20 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.2)] transition-colors duration-200">
-          {menu.map(item => {
-            const Icon = item.icon;
-            const active = location.pathname.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`group relative flex flex-col items-center justify-center flex-1 h-full pt-1 transition-all duration-200 ${
-                  active ? 'text-[#005BAC] dark:text-[#8AB4F8]' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
-              >
-                {active && (
-                  <div className="absolute top-0 w-8 h-1 bg-[#005BAC] dark:bg-[#8AB4F8] rounded-b-full"></div>
-                )}
-                <div className={`p-1.5 rounded-xl mb-0.5 transition-all duration-200 ${
-                  active ? 'bg-[#E8F0FE] dark:bg-[#005BAC]/15 scale-110' : 'bg-transparent group-hover:bg-gray-50 dark:group-hover:bg-zinc-800/50'
-                }`}>
-                  <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-                </div>
-                <span className={`text-[10px] tracking-tight leading-none truncate max-w-full text-center transition-all ${
-                  active ? 'font-bold' : 'font-medium'
-                }`}>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
       </main>
     </div>
   );
