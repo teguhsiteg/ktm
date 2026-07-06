@@ -12,6 +12,7 @@ import { CheckCircle2, XCircle, Scan, AlertCircle, RotateCcw, Trash2, Clock, Che
 import { toast } from 'sonner';
 import { isBookingNotStartedYet, isBookingExpired } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { useAdmin } from '@/contexts/AdminContext';
 
 type ScannedLog = {
   id: string; // distribusi id
@@ -19,9 +20,11 @@ type ScannedLog = {
   nim: string;
   nama: string;
   waktu: any;
+  admin_nama?: string;
 };
 
 export default function ScannerPage() {
+  const { adminData, adminId } = useAdmin();
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [booking, setBooking] = useState<Booking | null>(null);
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa | null>(null);
@@ -224,7 +227,8 @@ export default function ScannerPage() {
           booking_id: data.booking_id,
           nim: data.nim,
           nama: data.nama,
-          waktu: data.waktu_pengambilan?.toDate() || new Date()
+          waktu: data.waktu_pengambilan?.toDate() || new Date(),
+          admin_nama: data.admin_nama || data.admin_id || 'Administrator'
         });
       });
       setRecentLogs(logs);
@@ -547,7 +551,8 @@ export default function ScannerPage() {
       // Add to distribusi activity log
       const distRef = await addDoc(collection(db, 'distribusi'), {
         booking_id: booking.id,
-        admin_id: 'admin_1', // mocked for now
+        admin_id: adminId || 'admin_unknown',
+        admin_nama: adminData?.nama || adminData?.email || 'Administrator',
         waktu_pengambilan: serverTimestamp(),
         status: 'Sudah Diambil',
         nim: mahasiswa.nim,
@@ -560,7 +565,8 @@ export default function ScannerPage() {
         booking_id: booking.id,
         nim: mahasiswa.nim,
         nama: mahasiswa.nama,
-        waktu: new Date()
+        waktu: new Date(),
+        admin_nama: adminData?.nama || adminData?.email || 'Administrator'
       }, ...prev]);
 
       setStatus('used'); // Update local UI
@@ -654,7 +660,8 @@ export default function ScannerPage() {
         'Booking ID': log.booking_id,
         'NIM': log.nim,
         'Nama': log.nama,
-        'Waktu Penyerahan': format(log.waktu instanceof Date ? log.waktu : new Date(log.waktu), 'yyyy-MM-dd HH:mm:ss')
+        'Waktu Penyerahan': format(log.waktu instanceof Date ? log.waktu : new Date(log.waktu), 'yyyy-MM-dd HH:mm:ss'),
+        'Verifikator': log.admin_nama || 'Administrator'
       }));
       
       const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -701,7 +708,8 @@ export default function ScannerPage() {
       // 2. Add to distribusi activity log
       const distRef = await addDoc(collection(db, 'distribusi'), {
         booking_id: item.booking_id,
-        admin_id: 'admin_1', // mocked for now
+        admin_id: adminId || 'admin_unknown',
+        admin_nama: adminData?.nama || adminData?.email || 'Administrator',
         waktu_pengambilan: serverTimestamp(),
         status: 'Sudah Diambil',
         nim: item.nim,
@@ -720,7 +728,8 @@ export default function ScannerPage() {
         booking_id: item.booking_id,
         nim: item.nim,
         nama: item.nama,
-        waktu: new Date()
+        waktu: new Date(),
+        admin_nama: adminData?.nama || adminData?.email || 'Administrator'
       }, ...prev]);
 
       // If currently showing this student in the admin local scanner, set status as used
@@ -1143,6 +1152,11 @@ export default function ScannerPage() {
                                   <span className="text-[8px] px-1 py-0.1 bg-gray-100 dark:bg-zinc-800 text-gray-400 rounded">ID: {log.booking_id.substring(0, 5)}...</span>
                                 )}
                               </p>
+                              <div className="mt-1">
+                                <span className="inline-flex items-center gap-1 bg-[#E8F0FE] dark:bg-[#1A2E4C] text-[#005BAC] dark:text-[#8AB4F8] px-1.5 py-0.5 rounded text-[8.5px] font-bold">
+                                  Verifikator: {log.admin_nama || 'Administrator'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           

@@ -28,10 +28,11 @@ import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { ProdiMapping } from '@/types';
 import { PRODI_TO_FACULTY_MAP } from '@/utils/prodiMapping';
 import { useAdmin } from '@/contexts/AdminContext';
+import { Navigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 
 export default function LokasiPage() {
-  const { adminData } = useAdmin();
+  const { adminData, loadingAdmin } = useAdmin();
   const [mappings, setMappings] = useState<ProdiMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingExcel, setUploadingExcel] = useState(false);
@@ -75,6 +76,18 @@ export default function LokasiPage() {
     });
     return () => unsub();
   }, []);
+
+  if (loadingAdmin) {
+    return (
+      <div className="min-h-[200px] flex items-center justify-center text-gray-500 font-medium">
+        Memuat data administrator...
+      </div>
+    );
+  }
+
+  if (!adminData || adminData.role !== 'super_admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   const resetForm = () => {
     setFormData({ prodi: '', fakultas: '', lokasi: '' });

@@ -69,12 +69,12 @@ export default function AdminLayout() {
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Mahasiswa', path: '/admin/mahasiswa', icon: Users },
     { name: 'Jadwal', path: '/admin/jadwal', icon: CalendarDays },
-    { name: 'Fakultas & Prodi', path: '/admin/lokasi', icon: Building2 },
     { name: 'Booking', path: '/admin/booking', icon: Ticket },
     { name: 'Scanner', path: '/admin/scanner', icon: ScanLine },
   ];
 
   if (adminData?.role === 'super_admin') {
+    menu.push({ name: 'Fakultas & Prodi', path: '/admin/lokasi', icon: Building2 });
     menu.push({ name: 'Admins', path: '/admin/users', icon: Users });
     menu.push({ name: 'Pengaturan', path: '/admin/pengaturan', icon: Settings });
   }

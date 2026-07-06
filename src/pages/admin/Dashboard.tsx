@@ -308,13 +308,17 @@ export default function Dashboard() {
                      <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 font-bold mt-0.5">
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      </div>
-                     <div>
-                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                     <div className="flex-1 min-w-0">
+                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate">
                          {act.nama || 'KTM diserahkan'}
                        </p>
                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">NIM: <span className="font-mono text-gray-750 dark:text-gray-350 font-medium">{act.nim}</span></p>
-                       <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-                         {act.waktu_pengambilan ? format(act.waktu_pengambilan.toDate(), 'HH:mm - dd MMM yyyy', { locale: localeID }) : ''}
+                       <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 flex flex-wrap items-center gap-1.5 font-medium">
+                         <span>{act.waktu_pengambilan ? format(act.waktu_pengambilan.toDate(), 'HH:mm - dd MMM yyyy', { locale: localeID }) : ''}</span>
+                         <span className="text-gray-300 dark:text-gray-700 font-normal">•</span>
+                         <span className="bg-[#E8F0FE] dark:bg-[#1A2E4C] text-[#005BAC] dark:text-[#8AB4F8] font-bold px-1.5 py-0.5 rounded text-[8.5px]">
+                           Verifikator: {act.admin_nama || 'Administrator'}
+                         </span>
                        </p>
                      </div>
                    </div>
