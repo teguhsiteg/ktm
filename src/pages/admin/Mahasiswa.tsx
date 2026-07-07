@@ -7,6 +7,8 @@ import { collection, onSnapshot, addDoc, serverTimestamp, writeBatch, doc, getDo
 import { Mahasiswa, Booking } from '@/types';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { Download, Upload, Plus, FileSpreadsheet, Search, X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckSquare, Trash2, Check, AlertCircle } from 'lucide-react';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { isBookingExpired } from '@/lib/utils';
@@ -235,17 +237,93 @@ export default function MahasiswaPage() {
     reader.readAsBinaryString(file);
   };
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([{
-      NIM: '22531001',
-      Nama: 'Ahmad Fulan',
-      'Program Studi': 'Informatika',
-      TTL: '5/02/95',
-      'Status KTM': 'Tersedia'
-    }]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
-    XLSX.writeFile(wb, "Template_Mahasiswa.xlsx");
+  const downloadTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Data Mahasiswa');
+
+      // Setup columns
+      worksheet.columns = [
+        { header: 'NIM', key: 'nim', width: 15 },
+        { header: 'Nama', key: 'nama', width: 30 },
+        { header: 'Fakultas', key: 'fakultas', width: 35 },
+        { header: 'Program Studi', key: 'prodi', width: 40 },
+        { header: 'TTL', key: 'ttl', width: 20 },
+        { header: 'Status KTM', key: 'status', width: 15 }
+      ];
+
+      // Add a sample row
+      worksheet.addRow({
+        nim: '22531001',
+        nama: 'Ahmad Fulan',
+        fakultas: 'Fakultas Teknologi Industri (FTI)',
+        prodi: 'Informatika (Reguler)',
+        ttl: '05/02/1995',
+        status: 'Tersedia'
+      });
+
+      // Get list of prodis and faculties
+      const standardProdis = Object.keys(PRODI_TO_FACULTY_MAP);
+      const customProdis = customMappings.map(m => m.prodi).filter(Boolean);
+      const allProdis = Array.from(new Set([...standardProdis, ...customProdis])).sort();
+
+      const standardFaculties = Object.values(PRODI_TO_FACULTY_MAP).map(f => f.fakultas);
+      const customFaculties = customMappings.map(m => m.fakultas).filter(Boolean);
+      const allFaculties = Array.from(new Set([...standardFaculties, ...customFaculties])).sort();
+
+      // Create a hidden worksheet for validation data
+      const validationSheet = workbook.addWorksheet('ValidationData', { state: 'hidden' });
+      
+      // Add faculties to col A
+      allFaculties.forEach((fakultas, index) => {
+        validationSheet.getCell(`A${index + 1}`).value = fakultas;
+      });
+      
+      // Add prodis to col B
+      allProdis.forEach((prodi, index) => {
+        validationSheet.getCell(`B${index + 1}`).value = prodi;
+      });
+
+      // Apply data validation to the columns (e.g., from row 2 to 1000)
+      for (let i = 2; i <= 1000; i++) {
+        // Fakultas dropdown (Column C)
+        worksheet.getCell(`C${i}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`ValidationData!$A$1:$A$${allFaculties.length}`]
+        };
+
+        // Prodi dropdown (Column D)
+        worksheet.getCell(`D${i}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`ValidationData!$B$1:$B$${allProdis.length}`]
+        };
+
+        // Status KTM dropdown (Column F)
+        worksheet.getCell(`F${i}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['"Tersedia,Belum Tersedia"']
+        };
+      }
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Generate Excel file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, 'Template_Mahasiswa.xlsx');
+    } catch (error) {
+      console.error('Error generating template:', error);
+      toast.error('Gagal membuat template Excel');
+    }
   };
 
   const handleExport = async () => {
