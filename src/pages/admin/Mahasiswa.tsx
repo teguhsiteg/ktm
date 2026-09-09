@@ -20,7 +20,7 @@ export default function MahasiswaPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [newMhs, setNewMhs] = useState({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
+  const [newMhs, setNewMhs] = useState({ nama: '', nim: '', prodi: '', upcm: '', status_ktm: 'Tersedia', catatan_ktm: '' });
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [customMappings, setCustomMappings] = useState<any[]>([]);
@@ -180,7 +180,7 @@ export default function MahasiswaPage() {
       });
       toast.success('Berhasil menambahkan mahasiswa');
       setShowAdd(false);
-      setNewMhs({ nama: '', nim: '', prodi: '', ttl: '', status_ktm: 'Tersedia', catatan_ktm: '' });
+      setNewMhs({ nama: '', nim: '', prodi: '', upcm: '', status_ktm: 'Tersedia', catatan_ktm: '' });
     } catch (e) {
       toast.error('Gagal menambahkan data');
     }
@@ -211,7 +211,7 @@ export default function MahasiswaPage() {
               nim: String(row.NIM),
               nama: String(row.Nama),
               prodi: String(row['Program Studi'] || row.Prodi || ''),
-              ttl: String(row.TTL || row['Tanggal Lahir'] || row['Tempat Tanggal Lahir'] || ''),
+              upcm: String(row.UPCM || row['No. UPCM'] || row.TTL || row['Tanggal Lahir'] || ''),
               status_ktm: String(row['Status KTM'] || 'Tersedia'),
               created_at: serverTimestamp()
             });
@@ -248,7 +248,7 @@ export default function MahasiswaPage() {
         { header: 'Nama', key: 'nama', width: 30 },
         { header: 'Fakultas', key: 'fakultas', width: 35 },
         { header: 'Program Studi', key: 'prodi', width: 40 },
-        { header: 'TTL', key: 'ttl', width: 20 },
+        { header: 'No. UPCM', key: 'upcm', width: 20 },
         { header: 'Status KTM', key: 'status', width: 15 }
       ];
 
@@ -258,7 +258,7 @@ export default function MahasiswaPage() {
         nama: 'Ahmad Fulan',
         fakultas: 'Fakultas Teknologi Industri (FTI)',
         prodi: 'Informatika (Reguler)',
-        ttl: '05/02/1995',
+        upcm: 'UPCM-2025-22531001',
         status: 'Tersedia'
       });
 
@@ -338,7 +338,7 @@ export default function MahasiswaPage() {
           'NIM': mhs.nim,
           'Nama': mhs.nama,
           'Program Studi': mhs.prodi,
-          'TTL / Tanggal Lahir': mhs.ttl || '-',
+          'No. UPCM': mhs.upcm || mhs.ttl || '-',
           'Status Fisik KTM': mhs.status_ktm,
           'Status Pengambilan': mhsBooking ? mhsBooking.status : 'Belum Booking',
           'Tanggal Jadwal': mhsBooking ? mhsBooking.tanggal : '-',
@@ -379,7 +379,8 @@ export default function MahasiswaPage() {
     let result = mahasiswa.filter(m => {
       const matchesSearch = 
         (m.nama || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (m.nim || '').toLowerCase().includes(searchQuery.toLowerCase());
+        (m.nim || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.upcm || m.ttl || '').toLowerCase().includes(searchQuery.toLowerCase());
       
       const combStatus = getCombinedStatus(m, bookings);
       const matchesStatus = filterStatus === 'Semua' || combStatus === filterStatus;
@@ -523,11 +524,11 @@ export default function MahasiswaPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">TTL / Tanggal Lahir</label>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 block">No. UPCM</label>
                   <Input 
-                    placeholder="Contoh: 1999-05-12 atau 12/05/99" 
-                    value={newMhs.ttl} 
-                    onChange={e => setNewMhs({...newMhs, ttl: e.target.value})} 
+                    placeholder="Contoh: UPCM-2025-001" 
+                    value={newMhs.upcm} 
+                    onChange={e => setNewMhs({...newMhs, upcm: e.target.value})} 
                     required 
                     className="dark:bg-[#2A2A2A] dark:border-gray-800 h-10 text-xs rounded-xl" 
                   />
@@ -585,7 +586,7 @@ export default function MahasiswaPage() {
         <div className="md:col-span-3 relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-gray-400 dark:text-gray-500" />
           <Input 
-            placeholder="Cari nama / NIM..." 
+            placeholder="Cari nama / NIM / No. UPCM..." 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-10 h-10 w-full dark:bg-[#2A2A2A] dark:border-gray-800 dark:text-gray-100 text-xs"
@@ -739,8 +740,8 @@ export default function MahasiswaPage() {
                 <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('prodi')}>
                   Program Studi <SortIndicator columnKey="prodi" />
                 </th>
-                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('ttl')}>
-                  TTL <SortIndicator columnKey="ttl" />
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('upcm')}>
+                  No. UPCM <SortIndicator columnKey="upcm" />
                 </th>
                 <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => handleSort('status_ktm')}>
                   Status KTM <SortIndicator columnKey="status_ktm" />
@@ -774,7 +775,7 @@ export default function MahasiswaPage() {
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{m.nim}</td>
                     <td className="px-6 py-4 dark:text-gray-200">{m.nama}</td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.prodi}</td>
-                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.ttl || '-'}</td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{m.upcm || m.ttl || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1.5">
                         {(() => {
@@ -900,7 +901,7 @@ export default function MahasiswaPage() {
                   nim: editingMhs.nim,
                   nama: editingMhs.nama,
                   prodi: editingMhs.prodi,
-                  ttl: editingMhs.ttl,
+                  upcm: editingMhs.upcm || editingMhs.ttl || '',
                   status_ktm: editingMhs.status_ktm,
                   catatan_ktm: editingMhs.status_ktm === 'Belum tersedia' ? (editingMhs.catatan_ktm || '') : '',
                   updated_at: serverTimestamp()
@@ -960,13 +961,13 @@ export default function MahasiswaPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">TTL / Tanggal Lahir</label>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">No. UPCM</label>
                   <Input 
-                    value={editingMhs.ttl || ''} 
-                    onChange={e => setEditingMhs({...editingMhs, ttl: e.target.value})} 
+                    value={editingMhs.upcm || editingMhs.ttl || ''} 
+                    onChange={e => setEditingMhs({...editingMhs, upcm: e.target.value})} 
                     required 
                     className="dark:bg-[#2A2A2A] dark:border-gray-800"
-                    id="edit-ttl"
+                    id="edit-upcm"
                   />
                 </div>
               </div>

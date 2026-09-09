@@ -3,7 +3,8 @@ export interface Mahasiswa {
   nama: string;
   nim: string;
   prodi: string;
-  ttl?: string; // Tanggal Lahir / TTL
+  ttl?: string; // Tanggal Lahir / TTL (legacy)
+  upcm?: string; // No. UPCM
   status_ktm: 'Tersedia' | 'Belum tersedia' | 'Sudah diambil';
   catatan_ktm?: string; // Catatan untuk KTM Belum Tersedia
   tanggal_ambil?: any; // Waktu pengambilan KTM
