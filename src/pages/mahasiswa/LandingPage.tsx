@@ -108,7 +108,7 @@ function parseDateStringToDMY(str: string): { day: number; month: number; year: 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ nim: '', ttl: '', fakultas: '', prodi: '', wa: '' });
+  const [formData, setFormData] = useState({ nim: '', upcm: '', fakultas: '', prodi: '', wa: '' });
   const [prodis, setProdis] = useState<string[]>([
     'Informatika',
     'Teknik Industri',
@@ -243,8 +243,13 @@ export default function LandingPage() {
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.nim || !formData.ttl || !formData.fakultas || !formData.prodi || !formData.wa) {
+    if (!formData.nim || !formData.upcm || !formData.fakultas || !formData.prodi || !formData.wa) {
       toast.error('Harap lengkapi semua data');
+      return;
+    }
+
+    if (formData.upcm.trim().length < 5) {
+      toast.error('No. UPCM tidak valid (minimal 5 karakter)');
       return;
     }
     
@@ -266,69 +271,18 @@ export default function LandingPage() {
         const mhs = querySnapshot.docs[0].data() as Mahasiswa;
         mhs.id = querySnapshot.docs[0].id;
         
-        // Match TTL and Prodi with advanced separation normalization
         const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
-        
-        const dbTtlRaw = mhs.ttl || '';
-        const inputDateStr = formData.ttl; // 'yyyy-mm-dd'
+
+        // Cocokkan No. UPCM dengan field upcm di database
+        const dbUpcm = normalize(mhs.upcm || mhs.ttl || '');
+        const inputUpcm = normalize(formData.upcm);
+        const isUpcmMatch = dbUpcm === inputUpcm || dbUpcm.includes(inputUpcm) || inputUpcm.includes(dbUpcm);
+
         const dbProdi = normalize(mhs.prodi || '');
         const inputProdi = normalize(formData.prodi);
 
-        let isTtlMatch = false;
-        
-        // 1. Try parsed DMY comparison
-        const dbParsed = parseDateStringToDMY(dbTtlRaw);
-        if (dbParsed && inputDateStr) {
-          const [iYear, iMonth, iDay] = inputDateStr.split('-').map(Number);
-          // Compare day and month directly
-          if (dbParsed.day === iDay && dbParsed.month === iMonth) {
-            const dbYearStr = String(dbParsed.year);
-            const iYearStr = String(iYear);
-            if (dbYearStr === iYearStr || dbYearStr.slice(-2) === iYearStr.slice(-2)) {
-              isTtlMatch = true;
-            }
-          }
-        }
-        
-        // 2. Fallback: Generate potential permutations and compare
-        if (!isTtlMatch && inputDateStr) {
-          const [iYear, iMonth, iDay] = inputDateStr.split('-').map(Number);
-          const iYearStr = String(iYear);
-          const iYearShort = iYearStr.slice(-2);
-          const iMonthStrStr = String(iMonth);
-          const iMonthStrPad = String(iMonth).padStart(2, '0');
-          const iDayStrStr = String(iDay);
-          const iDayStrPad = String(iDay).padStart(2, '0');
-          
-          const dbTtlNormalized = normalize(dbTtlRaw);
-          
-          const candidates = [
-            `${iDayStrPad}${iMonthStrPad}${iYearStr}`,
-            `${iDayStrStr}${iMonthStrStr}${iYearStr}`,
-            `${iDayStrPad}${iMonthStrStr}${iYearStr}`,
-            `${iDayStrStr}${iMonthStrPad}${iYearStr}`,
-            
-            `${iDayStrPad}${iMonthStrPad}${iYearShort}`,
-            `${iDayStrStr}${iMonthStrStr}${iYearShort}`,
-            `${iDayStrPad}${iMonthStrStr}${iYearShort}`,
-            `${iDayStrStr}${iMonthStrPad}${iYearShort}`,
-            
-            `${iMonthStrPad}${iDayStrPad}${iYearStr}`,
-            `${iMonthStrStr}${iDayStrStr}${iYearStr}`,
-            `${iMonthStrPad}${iDayStrPad}${iYearShort}`,
-            `${iMonthStrStr}${iDayStrStr}${iYearShort}`,
-            
-            `${iYearStr}${iMonthStrPad}${iDayStrPad}`,
-            `${iYearStr}${iMonthStrStr}${iDayStrStr}`,
-          ].map(c => normalize(c));
-          
-          if (candidates.some(c => dbTtlNormalized.includes(c) || c.includes(dbTtlNormalized))) {
-            isTtlMatch = true;
-          }
-        }
-
-        if (!isTtlMatch) {
-          toast.error('Kombinasi NIM dan Tanggal Lahir tidak cocok');
+        if (!isUpcmMatch) {
+          toast.error('Kombinasi NIM dan No. UPCM tidak cocok');
           setResult(null);
         } else if (dbProdi !== inputProdi) {
           toast.error('Program Studi tidak sesuai');
@@ -346,6 +300,7 @@ export default function LandingPage() {
       setSearchDone(true);
     }
   };
+
 
   const proceedToSchedule = () => {
     if (result) {
@@ -408,7 +363,7 @@ export default function LandingPage() {
                 <div>
                   <h4 className="font-semibold text-sm text-gray-900 dark:text-white">Verifikasi Data</h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-                    Masukkan NIM, Tanggal Lahir (kalender), Prodi, dan nomor WhatsApp aktif Anda.
+                    Masukkan NIM, No. UPCM, Prodi, dan nomor WhatsApp aktif Anda.
                   </p>
                 </div>
               </div>
@@ -497,24 +452,38 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                {/* TTL Calendar Picker */}
+                {/* No. UPCM Input */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="ttl" className="flex items-center gap-1 font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                    Tanggal Lahir <span className="text-red-500 font-bold">*</span>
+                  <Label htmlFor="upcm" className="flex items-center gap-1 font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    No. UPCM <span className="text-red-500 font-bold">*</span>
                   </Label>
                   <div className="relative">
                     <Input 
-                      id="ttl" 
-                      type="date"
-                      value={formData.ttl}
-                      onChange={e => setFormData({...formData, ttl: e.target.value})}
+                      id="upcm" 
+                      type="text"
+                      placeholder="Masukkan No. UPCM Anda"
+                      value={formData.upcm}
+                      onChange={e => setFormData({...formData, upcm: e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')})}
                       required
-                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl cursor-pointer"
+                      maxLength={30}
+                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl"
                     />
                   </div>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" /> Pilih tanggal lahir Anda melalui kalender di atas
-                  </p>
+                  {/* Tombol Lupa UPCM */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nomorWA = '6285179594146';
+                      const pesan = `Assalamu'alaikum, Admin FMIPA UII.\n\nSaya mahasiswa UII yang ingin menanyakan Nomor UPCM saya untuk keperluan pengambilan KTM melalui portal layanan mandiri.\n\nNIM saya: ${formData.nim || '(belum diisi)'}\n\nMohon bantuannya untuk menginformasikan Nomor UPCM saya.\n\nTerima kasih. 🙏`;
+                      window.open(`https://wa.me/${nomorWA}?text=${encodeURIComponent(pesan)}`, '_blank');
+                    }}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors mt-1"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current text-green-500" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    Lupa No. UPCM? Hubungi Admin via WhatsApp
+                  </button>
                 </div>
 
                 {/* Fakultas Selector */}
@@ -608,7 +577,7 @@ export default function LandingPage() {
                     </div>
                     <div className="font-bold text-sm">Data Mahasiswa Tidak Ditemukan</div>
                     <p className="text-xs text-red-600 dark:text-red-500 mt-1 leading-relaxed">
-                      NIM atau Program Studi Anda tidak cocok dengan database kami. Pastikan juga tanggal lahir Anda telah dimasukkan dengan benar di kalender.
+                      NIM atau Program Studi Anda tidak cocok dengan database kami. Pastikan juga No. UPCM Anda telah dimasukkan dengan benar.
                     </p>
                   </CardContent>
                 </Card>
