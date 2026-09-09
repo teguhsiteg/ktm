@@ -211,7 +211,7 @@ export default function MahasiswaPage() {
               nim: String(row.NIM),
               nama: String(row.Nama),
               prodi: String(row['Program Studi'] || row.Prodi || ''),
-              upcm: String(row.UPCM || row['No. UPCM'] || row.TTL || row['Tanggal Lahir'] || ''),
+              upcm: String(row['No. UPCM'] || row.UPCM || row['No UPCM'] || row['Nomor UPCM'] || row.upcm || row.TTL || row['Tanggal Lahir'] || ''),
               status_ktm: String(row['Status KTM'] || 'Tersedia'),
               created_at: serverTimestamp()
             });
