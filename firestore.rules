@@ -57,9 +57,16 @@ service cloud.firestore {
       // Public can read or list bookings to check reservation status
       allow read: if true;
       
-      // Public can create new bookings with initial status "Belum Diambil" and required schema keys
-      allow create: if request.resource.data.status == 'Belum Diambil' 
+      // Helper to check if booking portal is currently active in global settings
+      function isBookingActive() {
+        return get(/databases/$(database)/documents/settings/global).data.booking_active == true;
+      }
+
+      // Public can create new bookings only when portal is open
+      allow create: if isBookingActive()
+                    && request.resource.data.status == 'Belum Diambil' 
                     && request.resource.data.keys().hasAll(['booking_id', 'mahasiswa_id', 'jadwal_id', 'tanggal', 'jam', 'wa', 'status', 'qr_token', 'created_at', 'updated_at']);
+
                     
       // Public can change ticket status to "Hangus" to flag expired bookings OR reschedule their schedule (with WA update)
       allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at'])

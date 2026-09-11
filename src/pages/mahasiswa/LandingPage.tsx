@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { Mahasiswa } from '@/types';
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
+import { Mahasiswa, GlobalSettings, defaultSettings } from '@/types';
 import { getFacultyInfo } from '@/utils/prodiMapping';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -25,7 +25,12 @@ import {
   BookOpen,
   CheckCircle2,
   XCircle,
-  FileText
+  FileText,
+  Clock,
+  Phone,
+  Mail,
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 
 // Helper function to parse different date string formats from DB to DMY
@@ -143,6 +148,9 @@ export default function LandingPage() {
   const [result, setResult] = useState<Mahasiswa | null>(null);
   const [searchDone, setSearchDone] = useState(false);
   const [customMappings, setCustomMappings] = useState<any[]>([]);
+  const [settings, setSettings] = useState<GlobalSettings>(defaultSettings);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
 
   // Unique Fakultas derived dynamically from the database mappings
   const uniqueFakultas = useMemo(() => {
@@ -227,6 +235,22 @@ export default function LandingPage() {
     fetchMappings();
   }, []);
 
+  // Real-time synchronization with global settings from /admin/pengaturan
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'global'), (snap) => {
+      if (snap.exists()) {
+        setSettings({ ...defaultSettings, ...snap.data() as GlobalSettings });
+      }
+      setLoadingSettings(false);
+    }, (err) => {
+      console.warn("Gagal memuat pengaturan global (menggunakan default):", err);
+      setLoadingSettings(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+
   const getFacultyInfoWithCustom = (prodiName: string) => {
     const normalize = (val: string) => val.toLowerCase().replace(/[\/\s._-]/g, '').trim();
     const matched = customMappings.find(
@@ -243,6 +267,11 @@ export default function LandingPage() {
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
+    if (!settings.booking_active) {
+      toast.error('Gerbang pendaftaran dan booking jadwal KTM sedang ditutup sementara oleh administrator.');
+      return;
+    }
+
     if (!formData.nim || !formData.upcm || !formData.fakultas || !formData.prodi || !formData.wa) {
       toast.error('Harap lengkapi semua data');
       return;
@@ -303,6 +332,10 @@ export default function LandingPage() {
 
 
   const proceedToSchedule = () => {
+    if (!settings.booking_active) {
+      toast.error('Gerbang reservasi pengambilan KTM sedang ditutup sementara.');
+      return;
+    }
     if (result) {
       navigate(`/schedule/${result.id}`, { state: { wa: formData.wa } });
     }
@@ -324,9 +357,26 @@ export default function LandingPage() {
                 Universitas Islam Indonesia
               </span>
               <span className="text-[10px] text-[#005BAC] dark:text-[#8AB4F8] font-bold tracking-wider block uppercase mt-0.5">
-                Sistem Reservasi KTM
+                Sistem Reservasi KTM {settings.tahun_akademik ? `• TA ${settings.tahun_akademik} (${settings.semester})` : ''}
               </span>
             </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-3 text-xs font-medium text-gray-600 dark:text-gray-300">
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-800/80 px-3 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700">
+              <Clock className="w-3.5 h-3.5 text-[#005BAC] dark:text-[#8AB4F8]" />
+              <span className="font-semibold text-gray-800 dark:text-gray-200">{settings.operasional_jam || '08:00 - 15:00 WIB'}</span>
+            </div>
+            {settings.whatsapp_help && (
+              <a 
+                href={`https://wa.me/${settings.whatsapp_help.replace(/\D/g, '')}`} 
+                target="_blank" 
+                rel="noreferrer"
+                className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-colors border border-emerald-200 dark:border-emerald-800"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span className="font-semibold">Bantuan Admin</span>
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -334,26 +384,52 @@ export default function LandingPage() {
       {/* Main Container */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-12 items-start flex-grow">
         
+        {/* Banner Gerbang Ditutup Sementara (jika dinonaktifkan di /admin/pengaturan) */}
+        {!settings.booking_active && (
+          <div className="lg:col-span-12 w-full bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-800/80 rounded-2xl p-4 sm:p-5 flex items-start gap-4 shadow-sm text-red-900 dark:text-red-200 animate-in fade-in duration-300">
+            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/50 flex items-center justify-center shrink-0 text-red-600 dark:text-red-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-left flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-bold text-sm sm:text-base text-red-900 dark:text-red-200">
+                  Gerbang Booking Jadwal KTM Ditutup Sementara
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-200">
+                  Booking Nonaktif
+                </span>
+              </div>
+              <p className="text-xs text-red-800 dark:text-red-300 leading-relaxed">
+                Saat ini sistem reservasi jadwal pengambilan KTM dinonaktifkan sementara oleh administrator untuk periode TA {settings.tahun_akademik} ({settings.semester}). Mahasiswa hanya dapat melakukan pengecekan ketersediaan fisik KTM, namun <strong>pemilihan sesi jadwal pengambilan ditutup</strong> hingga gerbang reservasi dibuka kembali.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Left Side: Professional Information and Guides */}
         <section className="lg:col-span-7 space-y-6 lg:space-y-8 w-full">
-          <div className="space-y-4">
+          <div className="space-y-4 text-left">
             <div className="inline-flex items-center gap-2 bg-[#005BAC]/10 text-[#005BAC] dark:text-[#8AB4F8] dark:bg-[#005BAC]/20 px-3 py-1.5 rounded-full text-xs font-semibold">
               <Info className="w-3.5 h-3.5" />
-              Layanan Mandiri Pengambilan Kartu Tanda Mahasiswa
+              Layanan Mandiri Pengambilan KTM • Semester {settings.semester} {settings.tahun_akademik}
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-[1.15]">
-              Reservasi Pengambilan <span className="text-[#005BAC]">KTM UII</span> Baru Lebih Mudah
+              {settings.booking_active ? 'Reservasi Pengambilan ' : 'Pengecekan Fisik '}
+              <span className="text-[#005BAC]">KTM UII</span>
+              {settings.booking_active ? ' Baru Lebih Mudah' : ' Mahasiswa'}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base leading-relaxed max-w-xl">
-              Hindari antrean panjang dan pastikan Kartu Tanda Mahasiswa (KTM) fisik Anda telah siap sebelum datang ke Kantor Pelayanan Akademik.
+              {settings.booking_active 
+                ? 'Hindari antrean panjang dan pastikan Kartu Tanda Mahasiswa (KTM) fisik Anda telah siap sebelum datang ke Kantor Pelayanan Akademik.'
+                : 'Cek kesiapan fisik Kartu Tanda Mahasiswa (KTM) Anda sebelum gerbang reservasi jadwal dibuka oleh Kantor Pelayanan Akademik.'}
             </p>
           </div>
 
           {/* Stepper Guide */}
-          <div className="bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm space-y-6 transition-colors">
+          <div className="bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm space-y-6 transition-colors text-left">
             <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
               <BookOpen className="w-5 h-5 text-[#005BAC]" />
-              Panduan 4 Langkah Reservasi KTM
+              Panduan 4 Langkah Layanan KTM
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex gap-3">
@@ -385,9 +461,18 @@ export default function LandingPage() {
                   3
                 </div>
                 <div>
-                  <h4 className="font-semibold text-sm text-gray-900 dark:text-white">Pilih Sesi Jadwal</h4>
+                  <h4 className="font-semibold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                    Pilih Sesi Jadwal
+                    {!settings.booking_active && (
+                      <span className="text-[10px] font-bold text-red-600 bg-red-100 dark:bg-red-950/60 px-1.5 py-0.2 rounded">
+                        Ditutup
+                      </span>
+                    )}
+                  </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-                    Tentukan hari dan jam pengambilan yang fleksibel sesuai sisa slot kuota harian.
+                    {settings.booking_active 
+                      ? 'Tentukan hari dan jam pengambilan yang fleksibel sesuai sisa slot kuota harian.'
+                      : 'Gerbang reservasi jadwal saat ini sedang dinonaktifkan sementara oleh administrator.'}
                   </p>
                 </div>
               </div>
@@ -406,16 +491,54 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Operational Hours & Helpdesk Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-800 rounded-xl flex items-center gap-3 shadow-xs text-left">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-[#005BAC] dark:text-[#8AB4F8] shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-gray-400 dark:text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Jam Operasional Layanan</span>
+                <span className="font-bold text-gray-900 dark:text-gray-100 text-xs truncate block">{settings.operasional_jam || '08:00 - 15:00 WIB'}</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-gray-200 dark:border-gray-800 rounded-xl flex items-center gap-3 shadow-xs text-left">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-gray-400 dark:text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Email Akademik</span>
+                <a 
+                  href={`mailto:${settings.email_help || 'akademik@uii.ac.id'}`}
+                  className="font-bold text-gray-900 dark:text-gray-100 hover:text-[#005BAC] dark:hover:text-[#8AB4F8] text-xs truncate block"
+                >
+                  {settings.email_help || 'akademik@uii.ac.id'}
+                </a>
+              </div>
+            </div>
+          </div>
+
           {/* Requirements Info Card */}
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-xl flex items-start gap-3">
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-xl flex items-start gap-3 text-left">
             <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
+            <div className="w-full">
               <p className="text-xs font-bold text-amber-900 dark:text-amber-400">PENTING: Persyaratan yang Harus Dibawa</p>
               <ul className="list-disc list-inside text-[11px] text-amber-800 dark:text-amber-500 mt-1 space-y-1">
                 <li>Bukti Identitas Diri Sementara (KTM Sementara/KTP Asli)</li>
                 <li>Bukti printout E-Tiket QR / screenshot HP secara jelas</li>
                 <li>Hadir tepat waktu sesuai jam reservasi yang dipilih</li>
               </ul>
+              {settings.instruksi_tambahan && (
+                <div className="mt-3 p-2.5 bg-white/80 dark:bg-gray-800/80 border border-amber-200/80 dark:border-amber-900/40 rounded-lg">
+                  <p className="text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
+                    Instruksi Tambahan Akademik:
+                  </p>
+                  <p className="text-[11px] text-gray-700 dark:text-gray-300 mt-0.5 leading-relaxed">
+                    {settings.instruksi_tambahan}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -423,16 +546,38 @@ export default function LandingPage() {
         {/* Right Side: Verification and Reservation Form */}
         <section className="lg:col-span-5 w-full">
           <Card className="border border-gray-200 dark:border-gray-800 shadow-lg bg-white dark:bg-[#1E1E1E] rounded-2xl overflow-hidden transition-colors">
-            <CardHeader className="bg-[#005BAC]/5 border-b border-gray-100 dark:border-gray-800 p-6">
-              <CardTitle className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <Search className="w-5 h-5 text-[#005BAC]" />
-                Cari & Reservasi KTM
-              </CardTitle>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Isi data di bawah ini untuk memulai pencarian status KTM Anda.
+            <CardHeader className="bg-[#005BAC]/5 border-b border-gray-100 dark:border-gray-800 p-6 text-left">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Search className="w-5 h-5 text-[#005BAC]" />
+                  {settings.booking_active ? 'Cari & Reservasi KTM' : 'Cek Kesiapan Fisik KTM'}
+                </CardTitle>
+                {!settings.booking_active && (
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 px-2.5 py-0.5 rounded-full border border-red-200 dark:border-red-900 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-red-600 dark:text-red-400" />
+                    Booking Ditutup
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                {settings.booking_active 
+                  ? 'Isi data di bawah ini untuk memulai pencarian dan reservasi jadwal KTM Anda.'
+                  : 'Pengecekan kesiapan cetak fisik kartu KTM (Pemilihan sesi jadwal reservasi sedang ditutup sementara).'}
               </p>
             </CardHeader>
             <CardContent className="p-6">
+              {!settings.booking_active && (
+                <div className="mb-5 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-3">
+                  <Lock className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="text-left text-xs text-red-900 dark:text-red-200 space-y-1">
+                    <p className="font-bold text-sm">Formulir Reservasi Dinonaktifkan</p>
+                    <p className="text-red-800 dark:text-red-300 leading-relaxed">
+                      Gerbang pendaftaran dan reservasi jadwal pengambilan KTM saat ini dinonaktifkan oleh administrator. Seluruh formulir dikunci dan tidak dapat diisi hingga portal dibuka kembali.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSearch} className="space-y-4">
                 
                 {/* NIM Input */}
@@ -443,11 +588,12 @@ export default function LandingPage() {
                   <div className="relative">
                     <Input 
                       id="nim" 
-                      placeholder="Contoh: 236102601" 
+                      placeholder={settings.booking_active ? "Contoh: 236102601" : "Portal booking ditutup"} 
                       value={formData.nim}
                       onChange={e => setFormData({...formData, nim: e.target.value})}
                       required
-                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl"
+                      disabled={!settings.booking_active}
+                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl disabled:bg-gray-100 dark:disabled:bg-zinc-800/70 disabled:cursor-not-allowed disabled:opacity-70"
                     />
                   </div>
                 </div>
@@ -461,20 +607,21 @@ export default function LandingPage() {
                     <Input 
                       id="upcm" 
                       type="text"
-                      placeholder="Masukkan No. UPCM Anda"
+                      placeholder={settings.booking_active ? "Masukkan No. UPCM Anda" : "Portal booking ditutup"}
                       value={formData.upcm}
                       onChange={e => setFormData({...formData, upcm: e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')})}
                       required
                       maxLength={30}
-                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl"
+                      disabled={!settings.booking_active}
+                      className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl disabled:bg-gray-100 dark:disabled:bg-zinc-800/70 disabled:cursor-not-allowed disabled:opacity-70"
                     />
                   </div>
                   {/* Tombol Lupa UPCM */}
                   <button
                     type="button"
                     onClick={() => {
-                      const nomorWA = '6285179594146';
-                      const pesan = `Assalamu'alaikum, Admin FMIPA UII.\n\nSaya mahasiswa UII yang ingin menanyakan Nomor UPCM saya untuk keperluan pengambilan KTM melalui portal layanan mandiri.\n\nNIM saya: ${formData.nim || '(belum diisi)'}\n\nMohon bantuannya untuk menginformasikan Nomor UPCM saya.\n\nTerima kasih. 🙏`;
+                      const nomorWA = (settings.whatsapp_help || '628123456789').replace(/\D/g, '');
+                      const pesan = `Assalamu'alaikum, Admin Layanan Akademik UII.\n\nSaya mahasiswa UII yang ingin menanyakan Nomor UPCM saya untuk keperluan pengambilan KTM (${settings.semester} TA ${settings.tahun_akademik}) melalui portal layanan mandiri.\n\nNIM saya: ${formData.nim || '(belum diisi)'}\n\nMohon bantuannya untuk menginformasikan Nomor UPCM saya.\n\nTerima kasih. 🙏`;
                       window.open(`https://wa.me/${nomorWA}?text=${encodeURIComponent(pesan)}`, '_blank');
                     }}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors mt-1"
@@ -495,7 +642,8 @@ export default function LandingPage() {
                     id="fakultas"
                     value={formData.fakultas}
                     onChange={e => setFormData({...formData, fakultas: e.target.value, prodi: ''})}
-                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors"
+                    disabled={!settings.booking_active}
+                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors disabled:bg-gray-100 dark:disabled:bg-zinc-800/70 disabled:cursor-not-allowed disabled:opacity-70"
                     required
                   >
                     <option value="" className="text-gray-400">-- Pilih Fakultas --</option>
@@ -514,9 +662,9 @@ export default function LandingPage() {
                     id="prodi"
                     value={formData.prodi}
                     onChange={e => setFormData({...formData, prodi: e.target.value})}
-                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors disabled:opacity-60"
+                    className="flex h-11 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#2A2A2A] px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#005BAC] focus:border-transparent cursor-pointer transition-colors disabled:bg-gray-100 dark:disabled:bg-zinc-800/70 disabled:cursor-not-allowed disabled:opacity-70"
                     required
-                    disabled={!formData.fakultas}
+                    disabled={!settings.booking_active || !formData.fakultas}
                   >
                     <option value="" className="text-gray-400">
                       {formData.fakultas ? '-- Pilih Program Studi --' : '-- Pilih Fakultas Terlebih Dahulu --'}
@@ -535,30 +683,47 @@ export default function LandingPage() {
                   <Input 
                     id="wa"
                     type="tel"
-                    placeholder="Contoh: 081234567890" 
+                    placeholder={settings.booking_active ? "Contoh: 081234567890" : "Portal booking ditutup"} 
                     value={formData.wa}
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, '');
                       setFormData({...formData, wa: val});
                     }}
                     required
-                    className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl"
+                    disabled={!settings.booking_active}
+                    className="h-11 border-gray-200 focus:ring-[#005BAC] dark:bg-[#2A2A2A] dark:border-gray-800 text-sm rounded-xl disabled:bg-gray-100 dark:disabled:bg-zinc-800/70 disabled:cursor-not-allowed disabled:opacity-70"
                   />
                   <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                    Digunakan untuk pengiriman notifikasi/tiket cadangan.
+                    {settings.booking_active 
+                      ? 'Digunakan untuk pengiriman notifikasi/tiket cadangan.' 
+                      : 'Nomor WhatsApp aktif mahasiswa.'}
                   </p>
                 </div>
 
                 {/* Submit Button */}
-                <Button type="submit" className="w-full mt-2 bg-[#005BAC] hover:bg-[#004B8C] font-semibold text-sm rounded-xl shadow-md h-12 transition-all duration-200" disabled={loading}>
-                  {loading ? (
+                <Button 
+                  type="submit" 
+                  disabled={!settings.booking_active || loading}
+                  className={`w-full mt-2 font-semibold text-sm rounded-xl shadow-md h-12 transition-all duration-200 ${
+                    settings.booking_active 
+                      ? 'bg-[#005BAC] hover:bg-[#004B8C] text-white cursor-pointer' 
+                      : 'bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-300 dark:border-zinc-700'
+                  }`}
+                >
+                  {!settings.booking_active ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Lock className="w-4 h-4 text-gray-400" />
+                      Gerbang Booking Ditutup Sementara
+                    </span>
+                  ) : loading ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                       Mencari Data...
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
-                      <Search className="w-4 h-4" /> Cari Data Mahasiswa
+                      <Search className="w-4 h-4" /> 
+                      Cari Data & Reservasi Jadwal
                     </span>
                   )}
                 </Button>
@@ -662,23 +827,44 @@ export default function LandingPage() {
                         </div>
 
                         {/* Tempat Pengambilan Information Box */}
-                        <div className="p-4 bg-[#005BAC]/5 dark:bg-[#00BAC]/10 border border-[#005BAC]/15 rounded-xl space-y-2 text-left">
+                        <div className="p-4 bg-[#005BAC]/5 dark:bg-[#00BAC]/10 border border-[#005BAC]/15 rounded-xl space-y-1.5 text-left">
                           <div className="flex items-center gap-2 text-[#005BAC] dark:text-[#8AB4F8] font-bold text-xs uppercase tracking-wider">
                             <MapPin className="w-4 h-4 flex-shrink-0" />
-                            <span>Lokasi Pengambilan KTM</span>
+                            <span>Lokasi Fisik KTM</span>
                           </div>
                           <p className="text-xs text-gray-700 dark:text-gray-300 font-semibold leading-relaxed">
                             {facInfo.lokasi}
                           </p>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
-                            Silakan klik tombol di bawah untuk menentukan sesi waktu pengambilan Anda di lokasi ini.
-                          </p>
                         </div>
 
-                        <Button onClick={proceedToSchedule} className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold text-sm rounded-xl py-2.5 h-11 flex items-center justify-center gap-2">
-                          <span>Lanjut Pilih Sesi Jadwal</span>
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
+                        {settings.booking_active ? (
+                          <>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal text-left">
+                              Silakan klik tombol di bawah untuk menentukan sesi waktu pengambilan Anda di lokasi ini.
+                            </p>
+                            <Button onClick={proceedToSchedule} className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold text-sm rounded-xl py-2.5 h-11 flex items-center justify-center gap-2 shadow-sm">
+                              <span>Lanjut Pilih Sesi Jadwal</span>
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="p-4 bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-900/60 rounded-xl space-y-2 text-left">
+                            <div className="flex items-center gap-2 text-red-800 dark:text-red-300 font-bold text-xs uppercase tracking-wider">
+                              <Lock className="w-4 h-4 text-red-600 shrink-0" />
+                              <span>Gerbang Reservasi Jadwal Sedang Ditutup</span>
+                            </div>
+                            <p className="text-xs text-red-900 dark:text-red-200 leading-relaxed font-medium">
+                              Fisik KTM Anda sudah tercetak dan berada di kantor layanan di atas. Namun, <strong>portal pendaftaran dan pemilihan sesi jadwal saat ini sedang dinonaktifkan sementara</strong> oleh administrator akademik.
+                            </p>
+                            <p className="text-[11px] text-red-700 dark:text-red-400 leading-normal">
+                              Mahasiswa belum dapat membuat tiket pengambilan. Silakan pantau pengumuman resmi pembukaan gerbang reservasi selanjutnya.
+                            </p>
+                            <Button disabled className="w-full mt-2 bg-gray-200 dark:bg-zinc-800 text-gray-400 dark:text-gray-500 font-semibold text-xs rounded-xl py-2.5 h-10 flex items-center justify-center gap-2 cursor-not-allowed border border-gray-300 dark:border-zinc-700">
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Pemilihan Jadwal Belum Dibuka</span>
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );
@@ -691,7 +877,7 @@ export default function LandingPage() {
 
       {/* Footer Branding */}
       <footer className="bg-white dark:bg-[#1E1E1E] border-t border-gray-200 dark:border-gray-800 mt-16 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
           <div className="flex items-center space-x-3 justify-center md:justify-start">
             <img 
               src="/logo-uii.png" 
@@ -701,9 +887,38 @@ export default function LandingPage() {
             />
             <div>
               <p className="text-xs font-bold text-gray-900 dark:text-white tracking-tight">Universitas Islam Indonesia</p>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400">Jl. Kaliurang KM. 14,5, Yogyakarta, Indonesia</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">Jl. Kaliurang KM. 14,5, Sleman, D.I. Yogyakarta</p>
             </div>
           </div>
+
+          {/* Contact Helpline & Operational Info */}
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+              <Clock className="w-3.5 h-3.5 text-[#005BAC]" />
+              <span>{settings.operasional_jam || '08:00 - 15:00 WIB'}</span>
+            </div>
+            {settings.whatsapp_help && (
+              <a 
+                href={`https://wa.me/${settings.whatsapp_help.replace(/\D/g, '')}`} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 hover:underline"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>WA: +{settings.whatsapp_help}</span>
+              </a>
+            )}
+            {settings.email_help && (
+              <a 
+                href={`mailto:${settings.email_help}`} 
+                className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>{settings.email_help}</span>
+              </a>
+            )}
+          </div>
+
           <div className="text-center md:text-right space-y-1">
             <p className="text-xs text-gray-500 dark:text-gray-400">Developed by Guwigo Teknologi Indonesia</p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500">&copy; {new Date().getFullYear()} Universitas Islam Indonesia. All rights reserved.</p>

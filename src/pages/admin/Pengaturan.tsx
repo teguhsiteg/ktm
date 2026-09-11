@@ -25,26 +25,8 @@ import {
   Info
 } from 'lucide-react';
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { GlobalSettings, defaultSettings } from '@/types';
 
-interface GlobalSettings {
-  booking_active: boolean;
-  tahun_akademik: string;
-  semester: string;
-  operasional_jam: string;
-  whatsapp_help: string;
-  email_help: string;
-  instruksi_tambahan: string;
-}
-
-const defaultSettings: GlobalSettings = {
-  booking_active: true,
-  tahun_akademik: '2026/2027',
-  semester: 'Ganjil',
-  operasional_jam: '08:00 - 15:00 WIB',
-  whatsapp_help: '628123456789',
-  email_help: 'akademik@uii.ac.id',
-  instruksi_tambahan: 'Harap membawa fotokopi bukti pembayaran SPP/slip registrasi aktif semester berjalan saat pengambilan KTM.'
-};
 
 export default function PengaturanPage() {
   const { adminData, loadingAdmin } = useAdmin();

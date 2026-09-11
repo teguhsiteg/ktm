@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { Booking, Mahasiswa } from '@/types';
+import { Booking, Mahasiswa, GlobalSettings, defaultSettings } from '@/types';
 import { getFacultyInfo } from '@/utils/prodiMapping';
+
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -18,12 +19,14 @@ export default function TicketPage() {
   const { bookingId } = useParams();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa | null>(null);
+  const [settings, setSettings] = useState<GlobalSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
   const [customMappings, setCustomMappings] = useState<any[]>([]);
+
 
   useEffect(() => {
     const fetchMappings = async () => {
@@ -85,6 +88,15 @@ export default function TicketPage() {
         const mDoc = await getDoc(doc(db, 'mahasiswa', b.mahasiswa_id));
         if (mDoc.exists()) {
           setMahasiswa(mDoc.data() as Mahasiswa);
+        }
+
+        try {
+          const sDoc = await getDoc(doc(db, 'settings', 'global'));
+          if (sDoc.exists()) {
+            setSettings({ ...defaultSettings, ...sDoc.data() as GlobalSettings });
+          }
+        } catch (sErr) {
+          console.warn("Gagal memuat setting global untuk tiket:", sErr);
         }
         
         // Rapid completion
@@ -280,7 +292,9 @@ export default function TicketPage() {
            <div className="absolute -bottom-3 -right-3 w-6 h-6 bg-gray-100 rounded-full print:border-l-2 print:border-t-2 print:border-gray-800 print:bg-white"></div>
            
            <h2 className="text-xl font-bold tracking-wide">Universitas Islam Indonesia</h2>
-           <p className="text-blue-100 text-sm mt-1">Booking Pengambilan KTM</p>
+           <p className="text-blue-100 text-sm mt-1">
+             Booking Pengambilan KTM {settings.tahun_akademik ? `• TA ${settings.tahun_akademik} (${settings.semester})` : ''}
+           </p>
         </div>
 
         {/* Divider dashed */}
@@ -361,6 +375,18 @@ export default function TicketPage() {
                       {facInfo.lokasi}
                     </p>
                   </div>
+
+                  {/* Instruksi Tambahan Banner */}
+                  {settings.instruksi_tambahan && (
+                    <div className="pt-4 border-t border-dashed border-gray-200 print:border-gray-800">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                        Instruksi Pengambilan
+                      </p>
+                      <p className={`text-xs leading-relaxed ${isExpired ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
+                        {settings.instruksi_tambahan}
+                      </p>
+                    </div>
+                  )}
                 </div>
               );
            })()}
@@ -371,11 +397,17 @@ export default function TicketPage() {
                <p className="text-xs text-gray-500 font-medium text-center mb-4 leading-relaxed">
                  Jadwal pengambilan tiket Anda telah hangus karena melewati batas waktu. Silakan ajukan ulang jadwal baru untuk mengambil KTM.
                </p>
-               <Button asChild className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold h-11 rounded-xl shadow-md transition-all duration-200">
-                 <Link to={`/schedule/${booking.mahasiswa_id}`} state={{ wa: booking.wa, reapply: true }}>
-                   Ajukan Ulang
-                 </Link>
-               </Button>
+               {settings.booking_active ? (
+                 <Button asChild className="w-full bg-[#005BAC] hover:bg-[#004B8C] font-semibold h-11 rounded-xl shadow-md transition-all duration-200">
+                   <Link to={`/schedule/${booking.mahasiswa_id}`} state={{ wa: booking.wa, reapply: true }}>
+                     Ajukan Ulang
+                   </Link>
+                 </Button>
+               ) : (
+                 <div className="w-full text-center text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                   Gerbang reservasi jadwal sedang ditutup sementara oleh pihak akademik.
+                 </div>
+               )}
              </div>
            )}
 

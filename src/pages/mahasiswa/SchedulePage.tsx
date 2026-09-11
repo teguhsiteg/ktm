@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { Jadwal, Mahasiswa, Booking } from '@/types';
+import { Jadwal, Mahasiswa, Booking, GlobalSettings, defaultSettings } from '@/types';
 import { getFacultyInfo } from '@/utils/prodiMapping';
 import { format, parseISO } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
@@ -25,11 +25,13 @@ export default function SchedulePage() {
 
   const [mahasiswa, setMahasiswa] = useState<Mahasiswa | null>(null);
   const [jadwal, setJadwal] = useState<Jadwal[]>([]);
+  const [settings, setSettings] = useState<GlobalSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [selectedJadwal, setSelectedJadwal] = useState<Jadwal | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [customMappings, setCustomMappings] = useState<any[]>([]);
+
 
   useEffect(() => {
     const fetchMappings = async () => {
@@ -68,6 +70,22 @@ export default function SchedulePage() {
 
     const fetchData = async () => {
       try {
+        // 1. Check global settings first
+        try {
+          const sDoc = await getDoc(doc(db, 'settings', 'global'));
+          if (sDoc.exists()) {
+            const sData = { ...defaultSettings, ...sDoc.data() as GlobalSettings };
+            setSettings(sData);
+            if (sData.booking_active === false && !isReschedule) {
+              toast.error('Gerbang reservasi jadwal pengambilan KTM sedang ditutup sementara oleh pihak akademik.');
+              navigate('/', { replace: true });
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Gagal membaca settings global:", e);
+        }
+
         // Check if student already booked
         const bookingQ = query(collection(db, 'booking'), where('mahasiswa_id', '==', id));
         const bookingSnap = await getDocs(bookingQ);
@@ -147,6 +165,11 @@ export default function SchedulePage() {
   const handleBooking = async () => {
     if (!selectedJadwal || !mahasiswa) return;
     
+    if (settings.booking_active === false && !isReschedule) {
+      toast.error('Gerbang reservasi jadwal telah ditutup sementara.');
+      return;
+    }
+
     const cleanWA = waNumber.trim().replace(/[^0-9]/g, '');
     if (!cleanWA) {
       toast.error('Harap masukkan nomor WhatsApp aktif Anda terlebih dahulu');
@@ -164,6 +187,16 @@ export default function SchedulePage() {
       const newBookingId = generateBookingId();
 
       await runTransaction(db, async (transaction) => {
+        // Enforce settings check inside transaction
+        const sRef = doc(db, 'settings', 'global');
+        const sSnap = await transaction.get(sRef);
+        if (sSnap.exists()) {
+          const sData = sSnap.data() as GlobalSettings;
+          if (sData.booking_active === false && !isReschedule) {
+            throw new Error('Gerbang reservasi pengambilan KTM saat ini sedang dinonaktifkan oleh administrator.');
+          }
+        }
+
         // Prepare document references
         const oldJRef = (isReschedule && oldJadwalId) ? doc(db, 'jadwal', oldJadwalId) : null;
         
@@ -174,6 +207,7 @@ export default function SchedulePage() {
         }
         
         const jDoc = await transaction.get(jRef);
+
         
         // 2. RUN VALIDATIONS & COMPUTE NEW STATES
         if (!jDoc.exists()) throw new Error('Jadwal tidak ditemukan');
@@ -572,7 +606,7 @@ export default function SchedulePage() {
               <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/50 dark:border-blue-950 rounded-xl mb-6 flex gap-2.5 items-start">
                 <Info className="w-4 h-4 text-[#005BAC] dark:text-blue-400 shrink-0 mt-0.5" />
                 <p className="text-[10.5px] text-blue-900 dark:text-blue-300 leading-relaxed font-medium">
-                  Harap hadir tepat waktu sesuai sesi yang dipilih dan membawa identitas pendukung (KTM lama, KTP, atau KRS aktif).
+                  {settings.instruksi_tambahan || 'Harap hadir tepat waktu sesuai sesi yang dipilih dan membawa identitas pendukung (KTM lama, KTP, atau KRS aktif).'}
                 </p>
               </div>
 
